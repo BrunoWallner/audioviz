@@ -6,6 +6,7 @@ It is not intended for scientifically usecases.
 ## demo
 A very simple demonstration implemented with [tui](https://github.com/fdehau/tui-rs) and [cpal](https://github.com/RustAudio/cpal)
 ![](/media/demo.gif)
+In realtime it is much faster and more fluid without the gif compression
 
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
