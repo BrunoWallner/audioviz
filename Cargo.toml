@@ -1,7 +1,15 @@
 [package]
 name = "audioviz"
 version = "0.1.0"
+authors = ["Luca <b.lucab@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "audioviz is a audio libary written in pure rust that makes raw audiodata visually more appealing"
+documentation = ""
+readme = "README.md"
+repository = "https://github.com/BrunoWallner/audioviz"
+keywords = ["audio", "FFT", "conversion"]
+categories = ["multimedia::audio"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
