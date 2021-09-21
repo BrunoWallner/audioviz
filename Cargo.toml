@@ -5,7 +5,6 @@ authors = ["Luca <b.lucab@gmail.com>"]
 edition = "2018"
 license = "MIT"
 description = "audioviz is a audio libary written in pure rust that makes raw audiodata visually more appealing"
-documentation = ""
 readme = "README.md"
 repository = "https://github.com/BrunoWallner/audioviz"
 keywords = ["audio", "FFT", "conversion"]
