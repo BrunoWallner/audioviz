@@ -32,7 +32,7 @@ pub fn convert_buffer(
     let percentage: f32 = config.max_frequency as f32 / 20_000_f32;
     let output_buffer = output_buffer[0..(output_buffer.len() as f32 * percentage) as usize].to_vec();
 
-    let mut output_buffer = normalize(output_buffer, config.volume_amplitude);
+    let mut output_buffer = normalize(output_buffer, config.volume);
 
     scale_frequencies(
         &mut output_buffer,
