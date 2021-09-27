@@ -4,9 +4,7 @@ A modular and simple libary to make raw and realtime audiodata captured for exam
 It is not intended for scientifically usecases.
 
 ## demo
-A very simple demonstration implemented with [tui](https://github.com/fdehau/tui-rs) and [cpal](https://github.com/RustAudio/cpal)
-![](/media/demo.gif)
-In realtime it is much faster and more fluid without the gif compression
+[simple implementation](https://github.com/BrunoWallner/audiovis)
 
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
