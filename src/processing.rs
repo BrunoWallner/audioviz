@@ -3,7 +3,7 @@ use crate::config::Config;
 
 /// puts buffer into FFT alogrithm and applies filters and modifiers to it
 pub fn convert_buffer(
-    input_buffer: Vec<f32>,
+    input_buffer: &Vec<f32>,
     config: Config,
 ) -> Vec<f32> {
     let input_buffer = apodize(input_buffer);
@@ -28,7 +28,11 @@ pub fn convert_buffer(
     // remove mirroring
     let output_buffer = output_buffer[0..(output_buffer.len() as f32 * 0.25) as usize].to_vec();
 
-    let mut output_buffer = normalize(output_buffer);
+    // max frequency
+    let percentage: f32 = config.max_frequency as f32 / 20_000_f32;
+    let output_buffer = output_buffer[0..(output_buffer.len() as f32 * percentage) as usize].to_vec();
+
+    let mut output_buffer = normalize(output_buffer, config.volume_amplitude);
 
     scale_frequencies(
         &mut output_buffer,
@@ -36,14 +40,15 @@ pub fn convert_buffer(
         config.frequency_scale_amount
     );
 
-    smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
+    bar_reduction(&mut output_buffer, config.density_reduction);
 
-    bar_reduction(&mut output_buffer, config.bar_reduction);
+    smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
 
     output_buffer
 }
 
-fn apodize(buffer: Vec<f32>) -> Vec<f32> {
+
+fn apodize(buffer: &Vec<f32>) -> Vec<f32> {
     let window = apodize::hanning_iter(buffer.len()).collect::<Vec<f64>>();
 
     let mut output_buffer: Vec<f32> = Vec::new();
@@ -83,7 +88,7 @@ fn scale_frequencies(buffer: &mut Vec<f32>, fav_freqs: [usize; 2], doubling: usi
 }
 
 #[allow(clippy::needless_range_loop)]
-fn normalize(buffer: Vec<f32>) -> Vec<f32> {
+fn normalize(buffer: Vec<f32>, volume_amplitude: f32) -> Vec<f32> {
     let buffer_len: usize = buffer.len();
     let mut output_buffer: Vec<f32> = vec![0.0; buffer_len];
 
@@ -102,8 +107,7 @@ fn normalize(buffer: Vec<f32>) -> Vec<f32> {
             pos_index.push([start_pos, end_pos]);
 
             // volume normalisation
-            let volume_offset: f32 = (i + 1) as f32 / buffer_len as f32;
-            let y = buffer[i] * volume_offset;
+            let y = buffer[i] / offset.powi(2) * volume_amplitude;
 
             if output_buffer[pos] < y {
                 output_buffer[pos] = y;
@@ -131,16 +135,17 @@ fn smooth(
     smoothing: usize,
     smoothing_size: usize,
 ) {
+    if buffer.len() <= smoothing_size {
+        return;
+    }
     for _ in 0..smoothing {
-        for i in 0..buffer.len() - smoothing_size as usize {
-            // reduce smoothing for higher freqs
-            let percentage: f32 = i as f32 / buffer.len() as f32;
-            let smoothing_size = (smoothing_size as f32 * (1.5 - percentage.powf(2.0))) as u32;
-
-            let mut y = 0.0;
+        for i in 0..buffer.len() {
+            let mut y: f32 = 0.0;
             for x in 0..smoothing_size as usize {
                 if buffer.len() > i + x {
                     y += buffer[i+x];
+                } else {
+                    y += 0.0;
                 }
             }
             buffer[i] = y / smoothing_size as f32;
@@ -161,9 +166,12 @@ fn bar_reduction(buffer: &mut Vec<f32>, bar_reduction: usize) {
         // smoothing of bars that are gonna be removed into the bar that stays
         let mut y: f32 = 0.0;
         for x in 0..bar_reduction as usize {
-            y += buffer[position + x];
+            let value = buffer[position + x];
+            if value > y {
+                y = value
+            }
         }
-        buffer[position] = y / bar_reduction as f32;
+        buffer[position] = y;
 
         if (position + bar_reduction as usize) < buffer.len() {
             buffer.drain(position..position + bar_reduction as usize);
@@ -183,7 +191,7 @@ fn bar_reduction(buffer: &mut Vec<f32>, bar_reduction: usize) {
 
 // combines 2-dimensional buffer (Vec<Vec<f32>>) into a 1-dimensional one that has the average value of the 2D buffer
 // EVERY 1D buffer of whole buffer MUST have the same length, but the current implementation guarantees this, considering the resolution stays the same
-pub fn combine_buffers(
+pub fn merge_buffers(
     buffer: &Vec<Vec<f32>>, // EVERY 1D buffer of whole buffer MUST have the same length
 ) -> Vec<f32> {
     let mut smoothed_percentage: f32 = 0.0;
@@ -191,7 +199,7 @@ pub fn combine_buffers(
     for (pos_z, z_buffer) in buffer.iter().enumerate() {
         // needed for weighting the Importance of earch z_buffer, more frequent -> more weight
         // should decrease latency
-        let percentage: f32 = pos_z as f32 / buffer.len() as f32;
+        let percentage: f32 = (pos_z + 1) as f32 / buffer.len() as f32;
         //let percentage: f32 = 1.0;
         smoothed_percentage += percentage;
         for (pos_x, value) in z_buffer.iter().enumerate() {

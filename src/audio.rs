@@ -34,11 +34,17 @@ impl AudioStream {
                     Event::SendData(mut b) => {
                         buffer.append(&mut b);
                         while buffer.len() > config.resolution {
-                            calculated_buffer = 
+                            let c_b = 
                                 convert_buffer(
-                                    buffer[0..config.resolution].to_vec(),
+                                    &buffer[0..config.resolution].to_vec(),
                                     config,
                                 );
+                            
+                            calculated_buffer = if !calculated_buffer.is_empty() {
+                                merge_buffers(&vec![calculated_buffer, c_b])
+                            } else {
+                                c_b
+                            };
 
                             // remove already calculated parts
                             buffer.drain(0..config.resolution);
@@ -52,7 +58,7 @@ impl AudioStream {
                             smoothing_buffer.push(calculated_buffer.clone());
                         }
                         smoothed_buffer = if !smoothing_buffer.is_empty() {
-                            combine_buffers(&smoothing_buffer)
+                            merge_buffers(&smoothing_buffer)
                         } else {
                             Vec::new()
                         };
