@@ -37,7 +37,8 @@ pub fn convert_buffer(
     scale_frequencies(
         &mut output_buffer,
         config.frequency_scale_range,
-        config.frequency_scale_amount
+        config.frequency_scale_amount,
+        config.max_frequency,
     );
 
     bar_reduction(&mut output_buffer, config.density_reduction);
@@ -59,20 +60,18 @@ fn apodize(buffer: &Vec<f32>) -> Vec<f32> {
     output_buffer
 }
 
-fn scale_frequencies(buffer: &mut Vec<f32>, fav_freqs: [usize; 2], doubling: usize) {
+fn scale_frequencies(buffer: &mut Vec<f32>, fav_freqs: [usize; 2], doubling: usize, max_freqs: usize) {
     let mut doubled: usize = 0;
     let buffer_len = buffer.len();
-    for i in 0..doubling {
-        let start_percentage: f32 = fav_freqs[0] as f32 / 20_000.0;
-        let end_percentage: f32 = fav_freqs[1] as f32 / 20_000.0;
+    for _ in 0..doubling {
+        let start_percentage: f32 = fav_freqs[0] as f32 / max_freqs as f32;
+        let end_percentage: f32 = fav_freqs[1] as f32 / max_freqs as f32;
 
-        let start_pos: usize = (buffer_len as f32 * start_percentage) as usize;
-        let end_pos: usize = (buffer_len as f32 * end_percentage) as usize;
+        let start_pos: f32 = buffer_len as f32 * start_percentage;
+        let end_pos: f32 = buffer_len as f32 * end_percentage;
 
-        let mut normalized_start_pos: usize = ((buffer_len as f32 / start_pos as f32).sqrt() * start_pos as f32) as usize;
-        normalized_start_pos = (normalized_start_pos as f32 * (1.0 - ( ( (i + 1) as f32 / doubling as f32) * 0.25))) as usize; // for smoothing edge between non scaled and scaled freqs
-
-        let normalized_end_pos: usize = ((buffer_len as f32 / end_pos as f32).sqrt() * end_pos as f32) as usize + doubled;
+        let normalized_start_pos: usize = ((buffer_len as f32 / start_pos).sqrt() * start_pos) as usize;
+        let normalized_end_pos: usize = ((buffer_len as f32 / end_pos).sqrt() * end_pos) as usize + doubled;
 
         let mut position: usize = normalized_start_pos;
         for _ in normalized_start_pos..normalized_end_pos {
@@ -88,7 +87,7 @@ fn scale_frequencies(buffer: &mut Vec<f32>, fav_freqs: [usize; 2], doubling: usi
 }
 
 #[allow(clippy::needless_range_loop)]
-fn normalize(buffer: Vec<f32>, volume_amplitude: f32) -> Vec<f32> {
+fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
     let buffer_len: usize = buffer.len();
     let mut output_buffer: Vec<f32> = vec![0.0; buffer_len];
 
@@ -107,7 +106,8 @@ fn normalize(buffer: Vec<f32>, volume_amplitude: f32) -> Vec<f32> {
             pos_index.push([start_pos, end_pos]);
 
             // volume normalisation
-            let y = buffer[i] / offset.powi(2) * volume_amplitude;
+            //let y = buffer[i] / offset.powi(2) * volume;                             /* old and non linear method */
+            let y = buffer[i] / (buffer.len() as f32 / (i + 1) as f32) * volume;    /* new and linear method */
 
             if output_buffer[pos] < y {
                 output_buffer[pos] = y;
@@ -144,12 +144,12 @@ fn smooth(
             for x in 0..smoothing_size as usize {
                 if buffer.len() > i + x {
                     y += buffer[i+x];
-                } else {
-                    y += 0.0;
                 }
             }
             buffer[i] = y / smoothing_size as f32;
         }
+        // remove parts that cannot be smoothed
+        buffer.drain(buffer.len() - 1 - smoothing_size..);
     }
 }
 
