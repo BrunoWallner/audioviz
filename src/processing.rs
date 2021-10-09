@@ -41,9 +41,9 @@ pub fn convert_buffer(
         config.max_frequency,
     );
 
-    bar_reduction(&mut output_buffer, config.density_reduction);
-
     smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
+
+    bar_reduction(&mut output_buffer, config.density_reduction);
 
     output_buffer
 }
@@ -106,8 +106,9 @@ fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
             pos_index.push([start_pos, end_pos]);
 
             // volume normalisation
-            //let y = buffer[i] / offset.powi(2) * volume;                             /* old and non linear method */
-            let y = buffer[i] / (buffer.len() as f32 / (i + 1) as f32) * volume;    /* new and linear method */
+            //let y = buffer[i] / offset.powi(2) * volume /* old and non linear method */
+            let offset = (i+1) as f32 / 20_000.0;
+            let y = buffer[i] * offset * volume;   /* new and linear method */
 
             if output_buffer[pos] < y {
                 output_buffer[pos] = y;
@@ -135,13 +136,15 @@ fn smooth(
     smoothing: usize,
     smoothing_size: usize,
 ) {
-    if buffer.len() <= smoothing_size {
+    if buffer.len() <= smoothing_size || smoothing_size == 0 {
         return;
     }
     for _ in 0..smoothing {
         for i in 0..buffer.len() {
+            let percentage: f32 = (buffer.len() - i) as f32 / buffer.len() as f32;
+            let smoothing_size: usize = (smoothing_size as f32 * percentage) as usize + 1;
             let mut y: f32 = 0.0;
-            for x in 0..smoothing_size as usize {
+            for x in 0..smoothing_size {
                 if buffer.len() > i + x {
                     y += buffer[i+x];
                 }
@@ -149,7 +152,7 @@ fn smooth(
             buffer[i] = y / smoothing_size as f32;
         }
         // remove parts that cannot be smoothed
-        buffer.drain(buffer.len() - 1 - smoothing_size..);
+        //buffer.drain(buffer.len() - 1 - smoothed..);
     }
 }
 
@@ -159,22 +162,24 @@ fn bar_reduction(buffer: &mut Vec<f32>, bar_reduction: usize) {
 
     'reducing: loop {
         // break if reached end of buffer
-        if position + bar_reduction as usize >= buffer.len() {
+        if position >= buffer.len() {
             break 'reducing;
         }
 
-        // smoothing of bars that are gonna be removed into the bar that stays
+        // smoothing of bars that are gonna be removed into the bar that remains
         let mut y: f32 = 0.0;
-        for x in 0..bar_reduction as usize {
-            let value = buffer[position + x];
-            if value > y {
-                y = value
+        let mut smoothed_amount: usize = 0;
+        for x in 0..bar_reduction {
+            if position + x < buffer.len() { 
+                let value = buffer[position + x];
+                y += value;
+                smoothed_amount = x;
             }
         }
-        buffer[position] = y;
+        buffer[position] = y / bar_reduction as f32;
 
-        if (position + bar_reduction as usize) < buffer.len() {
-            buffer.drain(position..position + bar_reduction as usize);
+        if smoothed_amount > 0 && position < buffer.len() && (position + smoothed_amount) < buffer.len() {
+            buffer.drain(position..(position + smoothed_amount)); // causes panic when resolution changes and buffers get not cleared via event
         }
 
         position += 1;
@@ -191,19 +196,21 @@ fn bar_reduction(buffer: &mut Vec<f32>, bar_reduction: usize) {
 
 // combines 2-dimensional buffer (Vec<Vec<f32>>) into a 1-dimensional one that has the average value of the 2D buffer
 // EVERY 1D buffer of whole buffer MUST have the same length, but the current implementation guarantees this, considering the resolution stays the same
+// if size changes you have to call 'Event::ClearBuffer'
 pub fn merge_buffers(
     buffer: &Vec<Vec<f32>>, // EVERY 1D buffer of whole buffer MUST have the same length
 ) -> Vec<f32> {
     let mut smoothed_percentage: f32 = 0.0;
     let mut output_buffer: Vec<f32> = vec![0.0; buffer[0].len()];
     for (pos_z, z_buffer) in buffer.iter().enumerate() {
-        // needed for weighting the Importance of earch z_buffer, more frequent -> more weight
-        // should decrease latency
+        // needed for weighting the Importance of earch z_buffer, more frequent -> more important
+        // should decrease latency and increase overall responsiveness
         let percentage: f32 = (pos_z + 1) as f32 / buffer.len() as f32;
-        //let percentage: f32 = 1.0;
         smoothed_percentage += percentage;
         for (pos_x, value) in z_buffer.iter().enumerate() {
-            output_buffer[pos_x] += value * percentage;
+            if pos_x < output_buffer.len() {
+                output_buffer[pos_x] += value * percentage;
+            }
         }
     }
 

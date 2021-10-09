@@ -15,13 +15,13 @@ impl Default for Config {
     fn default() -> Self {
         Config { 
             buffering: 5,
-            smoothing_size: 5,
+            smoothing_size: 10,
             smoothing_amount: 5,
             resolution: 3000,
             refresh_rate: 60,
-            frequency_scale_range: [0, 3500],
-            frequency_scale_amount: 3,
-            density_reduction: 10,
+            frequency_scale_range: [50, 1000],
+            frequency_scale_amount: 1,
+            density_reduction: 5,
             max_frequency: 20_000,
             volume: 1.0,
         }

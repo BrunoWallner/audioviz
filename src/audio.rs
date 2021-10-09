@@ -10,6 +10,7 @@ pub enum Event {
     RequestConfig(mpsc::Sender<Config>),
     SendConfig(Config),
     RequestRefresh,
+    ClearBuffer,
 }
 
 pub struct AudioStream {
@@ -62,7 +63,7 @@ impl AudioStream {
                         } else {
                             Vec::new()
                         };
-                        if smoothing_buffer.len() > config.buffering {
+                        while smoothing_buffer.len() > config.buffering {
                             smoothing_buffer.remove(0);
                         }
                     }
@@ -71,6 +72,9 @@ impl AudioStream {
                     }
                     Event::SendConfig(c) => {
                         config = c;
+                    }
+                    Event::ClearBuffer => {
+                        calculated_buffer = Vec::new();
                     }
                 }
             }
@@ -95,6 +99,7 @@ impl AudioStream {
     }
 
     // modifying the amount of bars during runtime will result in unexpected behavior
+    // unless sending 'Event::ClearBuffer' before
     // because the converter assumes that the bar amount stays the same
     // could be fixed by modifying ./src/processing/combine_buffers
     pub fn set_config(&self, config: Config) {
