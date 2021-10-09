@@ -1,8 +1,8 @@
 [package]
 name = "audioviz"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Luca <b.lucab@gmail.com>"]
-edition = "2021"
+edition = "2018"
 license = "MIT"
 description = "audioviz is a audio libary written in pure rust that makes raw audiodata using some algorithms like FFT visually appealing"
 readme = "README.md"
