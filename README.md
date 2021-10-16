@@ -5,6 +5,7 @@ It is not intended for scientifically usecases.
 
 ## demo
 [simple implementation](https://github.com/BrunoWallner/audiovis)
+[more advanced implementation](https://github.com/BrunoWallner/audiolizer)
 
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
@@ -13,9 +14,8 @@ It is not intended for scientifically usecases.
 * smoothing
 * resolution control
 * configurable refresh rate
-* scalable custom frequencies
-* very simple interface
-* only about 350 lines of code
+* configurable FFT and output resolution
+* very simple "interface"
 * multithreaded event based approach
 * should be able to be implemented in any project
 

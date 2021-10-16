@@ -34,10 +34,10 @@ impl AudioStream {
                 match event_receiver.recv().unwrap() {
                     Event::SendData(mut b) => {
                         buffer.append(&mut b);
-                        while buffer.len() > config.resolution {
+                        while buffer.len() > config.fft_resolution {
                             let c_b = 
                                 convert_buffer(
-                                    &buffer[0..config.resolution].to_vec(),
+                                    &buffer[0..config.fft_resolution].to_vec(),
                                     config,
                                 );
                             
@@ -48,7 +48,7 @@ impl AudioStream {
                             };
 
                             // remove already calculated parts
-                            buffer.drain(0..config.resolution);
+                            buffer.drain(0..config.fft_resolution);
                         }
                     },
                     Event::RequestData(sender) => {
