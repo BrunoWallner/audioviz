@@ -48,7 +48,8 @@ impl AudioStream {
                             };
 
                             // remove already calculated parts
-                            buffer.drain(0..config.fft_resolution);
+                            //buffer.drain(0..config.fft_resolution);
+                            buffer.drain(0..config.fft_resolution / 2); // overlapping
                         }
                     },
                     Event::RequestData(sender) => {
@@ -81,6 +82,11 @@ impl AudioStream {
         });
         let event_sender_clone = event_sender.clone();
         thread::spawn(move || loop {
+            // receiving refresh rate from main thread
+            let (tx, rx) = mpsc::channel();
+            event_sender_clone.send(Event::RequestConfig(tx)).unwrap();
+            let config = rx.recv().unwrap();
+
             thread::sleep(std::time::Duration::from_millis(1000 / config.refresh_rate as u64));
             event_sender_clone.send(Event::RequestRefresh).unwrap();
         });
@@ -98,13 +104,39 @@ impl AudioStream {
         self.event_sender.clone()
     }
 
+    pub fn adjust_volume(&self, v: f32) {
+        let config = self.get_config();
+        let config = Config {
+            volume: config.volume + v,
+            ..config
+        };
+        self.set_config(config);
+    }
+
     // modifying the amount of bars during runtime will result in unexpected behavior
     // unless sending 'Event::ClearBuffer' before
     // because the converter assumes that the bar amount stays the same
     // could be fixed by modifying ./src/processing/combine_buffers
     pub fn set_config(&self, config: Config) {
         self.event_sender.send(Event::SendConfig(config)).unwrap();
+    
     }
+
+    pub fn set_bar_number(&self, number: usize) {
+        let config = self.get_config();
+        let current_bars: f32 = config.fft_resolution as f32 * 0.25 * (config.max_frequency as f32 / 20_000.0);
+        let wanted_res: f32 = number as f32 / current_bars;
+
+        let wanted_conf = Config {
+            resolution: wanted_res,
+            ..config
+        };
+
+        self.event_sender.send(Event::SendConfig(wanted_conf)).unwrap();
+        self.event_sender.send(Event::ClearBuffer).unwrap();
+
+    }
+
     pub fn get_config(&self) -> Config {
         let (tx, rx) = mpsc::channel();
         self.event_sender.send(Event::RequestConfig(tx)).unwrap();
