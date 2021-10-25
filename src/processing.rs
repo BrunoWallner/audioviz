@@ -16,7 +16,7 @@ pub fn convert_buffer(
     for i in input_buffer.iter() {
         buffer.push(Complex {
             re: *i,
-            im: 0.0,
+            im: *i,
         });
     }
     fft.process(&mut buffer[..]);
@@ -33,13 +33,12 @@ pub fn convert_buffer(
     let percentage: f32 = config.max_frequency as f32 / 20_000_f32;
     let output_buffer = output_buffer[0..(output_buffer.len() as f32 * percentage) as usize].to_vec();
 
-    let mut output_buffer = normalize(output_buffer, config.volume, config.resolution);
+    let mut output_buffer = normalize(output_buffer, config.volume);
+    //let mut output_buffer = distribute(&output_buffer, 5);
 
     smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
 
-    //bar_reduction(&mut output_buffer, config.density_reduction);
-
-    output_buffer
+    apply_resolution(&output_buffer, config.resolution)
 }
 
 
@@ -55,19 +54,19 @@ fn apodize(buffer: &[f32]) -> Vec<f32> {
 }
 
 #[allow(clippy::needless_range_loop)]
-fn normalize(buffer: Vec<f32>, volume: f32, resolution: f32) -> Vec<f32> {
-    let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize ];
+fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
+    let mut output_buffer: Vec<f32> = vec![ 0.0; buffer.len() ];
 
     let mut pos_index: Vec<(usize, f32)> = Vec::new();
 
     for i in 0..buffer.len() {
-        let offset: f32 = (output_buffer.len() as f32 / (i + 1) as f32 * resolution).sqrt();
-        if ((i as f32 * offset) as usize) < output_buffer.len() {
+        let offset: f32 = (buffer.len() as f32 / (i + 1) as f32).sqrt();
+        if ((i as f32 * offset) as usize) < buffer.len() {
             // space normalisation
             let pos: usize = (i as f32 * offset) as usize;
             
             // volume normalisation
-            let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).sqrt();
+            let volume_offset: f32 = (buffer.len() as f32 / (pos + 1) as f32).sqrt();
             let y = buffer[i] / volume_offset.powi(3) * 0.01;
 
             pos_index.push( ((pos as f32) as usize, y) );
@@ -79,7 +78,25 @@ fn normalize(buffer: Vec<f32>, volume: f32, resolution: f32) -> Vec<f32> {
     for val in pos_index.iter() {
         let x = val.0 as f32;
         let y = val.1 * volume;
-        points.push(Key::new(x, y, Interpolation::Bezier(y)));
+        points.push(Key::new(x, y, Interpolation::Linear));
+    }
+
+    let spline = Spline::from_vec(points);
+
+    for i in 0..output_buffer.len() {
+        let v = spline.sample(i as f32).unwrap_or(0.0);
+        output_buffer[i] = v;
+    }
+
+    output_buffer
+}
+
+fn apply_resolution(buffer: &Vec<f32>, resolution: f32) -> Vec<f32> {
+    let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution) as usize];
+
+    let mut points: Vec<Key<f32, f32>> = Vec::new();
+    for (i, val) in buffer.iter().enumerate() {
+        points.push(Key::new(i  as f32 * resolution, *val, Interpolation::Linear));
     }
 
     let spline = Spline::from_vec(points);
