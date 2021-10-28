@@ -33,12 +33,12 @@ pub fn convert_buffer(
     let percentage: f32 = config.max_frequency as f32 / 20_000_f32;
     let output_buffer = output_buffer[0..(output_buffer.len() as f32 * percentage) as usize].to_vec();
 
-    let mut output_buffer = normalize(output_buffer, config.volume);
+    let output_buffer = normalize(output_buffer, config.volume);
+    let mut output_buffer = volume_distribution(&output_buffer, &vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, ]);
 
     smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
 
     let output_buffer = apply_resolution(&output_buffer, config.resolution);
-    let output_buffer = distribute(&output_buffer, &vec![1.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
     output_buffer
 }
@@ -64,12 +64,12 @@ fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
     for i in 0..buffer.len() {
         let offset: f32 = (buffer.len() as f32 / (i + 1) as f32).sqrt();
         if ((i as f32 * offset) as usize) < buffer.len() {
-            // space normalisation
-            let pos: usize = (i as f32 * offset) as usize;
-            
+            // space normalisation and space distribution
+            let pos = (i as f32 * offset) as usize;
+
             // volume normalisation
-            let volume_offset: f32 = (buffer.len() as f32 / (pos + 1) as f32).sqrt();
-            let y = buffer[i] / volume_offset.powi(3) * 0.002;
+            let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).sqrt();
+            let y = buffer[i] / volume_offset.powi(3) * 0.01;
 
             pos_index.push( ((pos as f32) as usize, y) );
         }
@@ -93,58 +93,60 @@ fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
     output_buffer
 }
 
-// with additional distribution
 fn apply_resolution(buffer: &Vec<f32>, resolution: f32) -> Vec<f32> {
-    let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize];
+    if resolution > 1.0 {
+        let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize];
 
-    let mut points: Vec<Key<f32, f32>> = Vec::new();
-    for (i, val) in buffer.iter().enumerate() {
-        points.push(Key::new(i  as f32 * resolution, *val, Interpolation::Linear));
+        let mut points: Vec<Key<f32, f32>> = Vec::new();
+        for (i, val) in buffer.iter().enumerate() {
+            points.push(Key::new(i  as f32 * resolution, *val, Interpolation::Linear));
+        }
+    
+        let spline = Spline::from_vec(points);
+    
+        for i in 0..output_buffer.len() {
+            let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
+            output_buffer[i] = v;
+        }
+    
+        return output_buffer;
+    }
+    else if resolution < 1.0 {
+        let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize];
+        let offset = output_buffer.len() as f32 / buffer.len() as f32;
+        for (i, val) in buffer.iter().enumerate() {
+            let pos = (i as f32 * offset) as usize;
+            if pos < output_buffer.len() {
+                if output_buffer[pos] < *val {
+                    output_buffer[pos] = *val;
+                }
+            }
+        }
+
+        return output_buffer;
+    }
+    else {
+        return buffer.to_vec();
     }
 
-    let spline = Spline::from_vec(points);
-
-    for i in 0..output_buffer.len() {
-        let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-        output_buffer[i] = v;
-    }
-
-    output_buffer
 }
 
-fn distribute(buffer: &Vec<f32>, distribution: &Vec<f32>) -> Vec<f32> {
-    let mut output_buffer: Vec<f32> = vec![0.0; buffer.len()];
+fn volume_distribution(buffer: &Vec<f32>, distribution: &Vec<f32>) -> Vec<f32> {
+    let mut output_buffer: Vec<f32> = vec![0.0; buffer.len()]; // must share same len with buffer
     
     let mut dis_points: Vec<Key<f32, f32>> = Vec::new();
     let step = output_buffer.len() as f32 / (distribution.len() - 1) as f32;
 
     for (i, val) in distribution.iter().enumerate() {
-        dis_points.push(Key::new(i as f32 * step, *val + 1.0, Interpolation::Linear));
+        dis_points.push(Key::new(i as f32 * step, *val, Interpolation::Linear));
     }
     let dis_spline = Spline::from_vec(dis_points);
 
-    let mut points: Vec<Key<f32, f32>> = Vec::new();
-    let mut offsetted: f32 = 1.0;
-    let mut dis_pos: f32 = 0.0;
-    for (i, val) in buffer.iter().enumerate() {
-        let offset = dis_spline.clamped_sample(i as f32).unwrap_or(1.0);
-        dis_pos = i as f32 * offset + offsetted;
-
-        points.push(Key::new(dis_pos, *val, Interpolation::Bezier( *val )));
-        
-        //offsetted *= offset;
-        let dif = (i as f32 * offset) - i as f32;
-        offsetted += dif;
-    };
-    let spline = Spline::from_vec(points);
-
     for i in 0..output_buffer.len() {
-        let pos: f32 = i as f32 * (dis_pos / output_buffer.len() as f32);
-        //let pos = i as f32;
-        let val = spline.sample(pos).unwrap_or(0.2);
-        output_buffer[i] = val;
+        let dis = dis_spline.sample(i as f32).unwrap_or(1.0);
+        output_buffer[i] = buffer[i] * dis;
     }
-
+    
     output_buffer
 }
 
