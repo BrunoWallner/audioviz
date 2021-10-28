@@ -107,7 +107,7 @@ impl AudioStream {
     pub fn adjust_volume(&self, v: f32) {
         let config = self.get_config();
         let config = Config {
-            volume: config.volume + v,
+            volume: config.volume * v,
             ..config
         };
         self.set_config(config);
