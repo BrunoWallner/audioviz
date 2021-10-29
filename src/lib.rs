@@ -1,7 +1,7 @@
-mod audio;
-mod processing;
+mod audio_stream;
+mod audio_data;
 mod config;
 
-pub use audio::AudioStream;
-pub use audio::Event;
+pub use audio_stream::AudioStream;
+pub use audio_stream::Event;
 pub use config::Config;
