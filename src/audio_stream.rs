@@ -1,6 +1,6 @@
 use std::thread;
 use std::sync::mpsc;
-use crate::processing::*;
+use crate::audio_data::*;
 use crate::config::Config;
 
 #[derive(Debug, Clone)]
@@ -34,12 +34,25 @@ impl AudioStream {
                 match event_receiver.recv().unwrap() {
                     Event::SendData(mut b) => {
                         buffer.append(&mut b);
-                        while buffer.len() > config.fft_resolution {
+                        let fft_res = config.fft_resolution;
+                        while buffer.len() > fft_res {
+                            let mut audio_data = AudioData::new(config.clone(), &buffer[0..fft_res].to_vec());
+                            audio_data.fft();
+                            audio_data.distribute_volume();
+                            audio_data.cut_off();
+                            audio_data.normalize();
+                            audio_data.smooth();
+                            audio_data.apply_resolution();
+
+                            let c_b = audio_data.buffer;
+
+                            /*
                             let c_b = 
                                 convert_buffer(
-                                    &buffer[0..config.fft_resolution].to_vec(),
-                                    config,
+                                    &buffer[0..fft_res].to_vec(),
+                                    &config,
                                 );
+                            */
                             
                             calculated_buffer = if !calculated_buffer.is_empty() {
                                 merge_buffers(&vec![calculated_buffer, c_b])
@@ -69,7 +82,7 @@ impl AudioStream {
                         }
                     }
                     Event::RequestConfig(sender) => {
-                        sender.send(config).unwrap();
+                        sender.send(config.clone()).unwrap();
                     }
                     Event::SendConfig(c) => {
                         config = c;
