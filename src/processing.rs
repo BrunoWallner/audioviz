@@ -62,13 +62,13 @@ fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
     let mut pos_index: Vec<(usize, f32)> = Vec::new();
 
     for i in 0..buffer.len() {
-        let offset: f32 = (buffer.len() as f32 / (i + 1) as f32).sqrt();
+        let offset: f32 = (buffer.len() as f32 / (i + 1) as f32).powf(0.75);
         if ((i as f32 * offset) as usize) < buffer.len() {
             // space normalisation and space distribution
             let pos = (i as f32 * offset) as usize;
 
             // volume normalisation
-            let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).sqrt();
+            let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).powf(0.75);
             let y = buffer[i] / volume_offset.powi(3) * 0.01;
 
             pos_index.push( ((pos as f32) as usize, y) );
