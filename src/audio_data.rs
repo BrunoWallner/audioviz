@@ -15,6 +15,15 @@ impl AudioData {
         }
     }
 
+    pub fn compute_all(&mut self) {
+        self.fft();
+        self.normalize();
+        self.distribute_volume();
+        self.smooth();
+        self.cut_off();
+        self.apply_bar_count();
+    }
+
     pub fn fft(&mut self) {
         let i_buf = apodize(&self.buffer[..]);
 
@@ -60,7 +69,7 @@ impl AudioData {
                 let buf_len = self.buffer.len();
                 for (i, val) in self.buffer.iter_mut().enumerate() {
                     let percentage: f32 = i as f32 / buf_len as f32;
-                    *val *= percentage;
+                    *val *= percentage * 2.0;
                 }
             }
             VolumeNormalisation::Exponentially => {
@@ -68,18 +77,12 @@ impl AudioData {
                 for (i, val) in self.buffer.iter_mut().enumerate() {
                     let offset: f32 = (buf_len as f32 / (i + 1) as f32).powf(0.5);
                     let pos = i as f32 * offset;
-                    let volume_offset: f32 = (buf_len as f32 / (pos + 1.0)).powf(0.5);
+                    let volume_offset: f32 = (buf_len as f32 / (pos.powi(2) + 1.0)).powf(0.5);
 
-                    *val /= volume_offset.powi(3);
+                    *val /= volume_offset.powi(3)  * 10.0_f32.powi(4); // las bit is needed so that value is between 0 and 1
                 }
             }
         }
-    }
-
-    #[inline]
-    pub fn cut_off(&mut self) {
-        let percentage: f32 = self.config.max_frequency as f32 / 20_000_f32;
-        self.buffer = self.buffer[0..(self.buffer.len() as f32 * percentage) as usize].to_vec();
     }
 
     pub fn normalize(&mut self) {
@@ -117,6 +120,15 @@ impl AudioData {
         }
     }
 
+    #[inline]
+    pub fn cut_off(&mut self) {
+        let percentage: f32 = self.config.max_frequency as f32 / 22_500_f32;
+        let pos = self.normalized_pos(
+            (self.buffer.len() as f32 * percentage) as usize 
+        );
+        self.buffer = self.buffer[0..pos].to_vec();
+    }
+
     pub fn smooth(&mut self) {
         if !(self.buffer.len() <= self.config.smoothing_size || self.config.smoothing_size == 0) {
             for _ in 0..self.config.smoothing_amount {
@@ -137,28 +149,39 @@ impl AudioData {
         }
     }
 
-    pub fn apply_resolution(&mut self) {
-        let mut output_buffer: Vec<f32> = vec![0.0; (self.buffer.len() as f32 * self.config.resolution ) as usize];
+    #[allow(clippy::collapsible_if)]
+    pub fn apply_bar_count(&mut self) {
+        let lin_percentage: f32 = self.config.max_frequency as f32 / 22_500_f32;
+        let norm_pos = self.normalized_pos(
+            (self.buffer.len() as f32 * lin_percentage) as usize 
+        );
 
-        if self.config.resolution > 1.0 {    
+        let current_bars: f32 = self.config.fft_resolution as f32 * 0.25 * (norm_pos as f32 / self.buffer.len() as f32);
+        let resolution: f32 = self.config.bar_count as f32 / current_bars;
+
+        let mut output_buffer: Vec<f32> = vec![0.0; (self.buffer.len() as f32 * resolution) as usize];
+
+        if resolution > 1.0 {    
             let mut points: Vec<Key<f32, f32>> = Vec::new();
             for (i, val) in self.buffer.iter().enumerate() {
-                points.push(Key::new(i  as f32 * self.config.resolution, *val, Interpolation::Linear));
+                points.push(Key::new(i  as f32 * resolution, *val, Interpolation::Linear));
             }
         
             let spline = Spline::from_vec(points);
         
-            for i in 0..output_buffer.len() {
+            for (i, val) in output_buffer.iter_mut().enumerate() {
                 let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-                output_buffer[i] = v;
+                *val = v;
             }
         
             self.buffer = output_buffer;
         }
-        else if self.config.resolution < 1.0 {
+        else if resolution < 1.0 {
             let offset = output_buffer.len() as f32 / self.buffer.len() as f32;
             for (i, val) in self.buffer.iter().enumerate() {
                 let pos = (i as f32 * offset) as usize;
+
+                // cannot be collapsed
                 if pos < output_buffer.len() {
                     if output_buffer[pos] < *val {
                         output_buffer[pos] = *val;
@@ -169,8 +192,12 @@ impl AudioData {
             self.buffer = output_buffer;
         }
         else {
-            ()
         } 
+    }
+
+    fn normalized_pos(&self, linear_pos: usize) -> usize {
+        let offset: f32 = (self.buffer.len() as f32 / (linear_pos + 1) as f32).powf(0.5);
+        (linear_pos as f32 * offset) as usize
     }
 }
 
@@ -212,173 +239,3 @@ pub fn merge_buffers(
 
     output_buffer
 }
-
-/*
-/// puts buffer into FFT alogrithm and applies filters and modifiers to it
-pub fn convert_buffer(
-    input_buffer: &[f32],
-    config: &Config,
-) -> Vec<f32> {
-    let input_buffer = apodize(input_buffer);
-
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(input_buffer.len());
-
-    let mut buffer: Vec<Complex<f32>> = Vec::new();
-    for i in input_buffer.iter() {
-        buffer.push(Complex {
-            re: *i,
-            im: *i,
-        });
-    }
-    fft.process(&mut buffer[..]);
-
-    let mut output_buffer: Vec<f32> = Vec::new();
-    for i in buffer.iter() {
-        output_buffer.push(i.norm())
-    }
-
-    // remove mirroring
-    let output_buffer = output_buffer[0..(output_buffer.len() as f32 * 0.25) as usize].to_vec();
-    let output_buffer = volume_distribution(&output_buffer, &vec![0.1, 0.4, 0.4, 0.5, 0.7, 0.9, 1.1, 1.4, 1.8, 2.3, 2.9, 3.7, ]);
-
-    // max frequency
-    let percentage: f32 = config.max_frequency as f32 / 20_000_f32;
-    let output_buffer = output_buffer[0..(output_buffer.len() as f32 * percentage) as usize].to_vec();
-
-    let mut output_buffer = normalize(output_buffer, config.volume);
-
-    smooth(&mut output_buffer, config.smoothing_amount, config.smoothing_size);
-
-    let output_buffer = apply_resolution(&output_buffer, config.resolution);
-
-    output_buffer
-}
-
-
-#[allow(clippy::needless_range_loop)]
-fn normalize(buffer: Vec<f32>, volume: f32) -> Vec<f32> {
-    let mut output_buffer: Vec<f32> = vec![ 0.0; buffer.len() ];
-
-    let mut pos_index: Vec<(usize, f32)> = Vec::new();
-
-    for i in 0..buffer.len() {
-        let offset: f32 = (buffer.len() as f32 / (i + 1) as f32).powf(0.5);
-
-        if ((i as f32 * offset) as usize) < buffer.len() {
-            // space normalisation and space distribution
-            let pos = (i as f32 * offset) as usize;
-
-            // volume normalisation
-            //let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).powf(0.5);
-            //let y = buffer[i] / volume_offset.powi(3) * 0.01;
-            let y = buffer[i] * 0.01;
-
-            pos_index.push( (pos, y) );
-        }
-    }
-
-    // Interpolation
-    let mut points: Vec<Key<f32, f32>> = Vec::new();
-    for val in pos_index.iter() {
-        let x = val.0 as f32;
-        let y = val.1 * volume;
-        points.push(Key::new(x, y, Interpolation::Linear));
-    }
-
-    let spline = Spline::from_vec(points);
-
-    for i in 0..output_buffer.len() {
-        let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-        output_buffer[i] = v;
-    }
-
-    output_buffer
-}
-
-fn apply_resolution(buffer: &Vec<f32>, resolution: f32) -> Vec<f32> {
-    if resolution > 1.0 {
-        let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize];
-
-        let mut points: Vec<Key<f32, f32>> = Vec::new();
-        for (i, val) in buffer.iter().enumerate() {
-            points.push(Key::new(i  as f32 * resolution, *val, Interpolation::Linear));
-        }
-    
-        let spline = Spline::from_vec(points);
-    
-        for i in 0..output_buffer.len() {
-            let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-            output_buffer[i] = v;
-        }
-    
-        return output_buffer;
-    }
-    else if resolution < 1.0 {
-        let mut output_buffer: Vec<f32> = vec![0.0; (buffer.len() as f32 * resolution ) as usize];
-        let offset = output_buffer.len() as f32 / buffer.len() as f32;
-        for (i, val) in buffer.iter().enumerate() {
-            let pos = (i as f32 * offset) as usize;
-            if pos < output_buffer.len() {
-                if output_buffer[pos] < *val {
-                    output_buffer[pos] = *val;
-                }
-            }
-        }
-
-        return output_buffer;
-    }
-    else {
-        return buffer.to_vec();
-    }
-
-}
-
-fn volume_distribution(buffer: &Vec<f32>, distribution: &Vec<f32>) -> Vec<f32> {
-    let mut output_buffer: Vec<f32> = vec![0.0; buffer.len()]; // must share same len with buffer
-    
-    let mut dis_points: Vec<Key<f32, f32>> = Vec::new();
-    let step = buffer.len() as f32 / (distribution.len() - 1) as f32;
-
-    for (i, val) in distribution.iter().enumerate() {
-        dis_points.push(Key::new(i as f32 * step, *val, Interpolation::Linear));
-    }
-    let dis_spline = Spline::from_vec(dis_points);
-
-    for i in 0..output_buffer.len() {
-        let offset: f32 = (output_buffer.len() as f32 / (i + 1) as f32).powf(0.5);
-        let pos: f32 = i as f32 * offset;
-        let dis = dis_spline.sample(pos).unwrap_or(1.0);
-
-        output_buffer[i] = buffer[i] * dis;
-        //output_buffer[i] = dis * 0.5;
-    }
-    
-    output_buffer
-}
-
-fn smooth(
-    buffer: &mut Vec<f32>,
-    smoothing: usize,
-    smoothing_size: usize,
-) {
-    if buffer.len() <= smoothing_size || smoothing_size == 0 {
-        return;
-    }
-    for _ in 0..smoothing {
-        for i in 0..buffer.len() {
-            //let percentage: f32 = (buffer.len() - i) as f32 / buffer.len() as f32;
-            //let smoothing_size: usize = (smoothing_size as f32 * percentage) as usize + 1;
-            let mut y: f32 = 0.0;
-            for x in 0..smoothing_size {
-                if buffer.len() > i + x {
-                    y += buffer[i+x];
-                }
-            }
-            buffer[i] = y / smoothing_size as f32;
-        }
-        // remove parts that cannot be smoothed
-        //buffer.drain(buffer.len() - 1 - smoothed..);
-    }
-}
-*/
