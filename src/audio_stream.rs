@@ -37,12 +37,7 @@ impl AudioStream {
                         let fft_res = config.fft_resolution;
                         while buffer.len() > fft_res {
                             let mut audio_data = AudioData::new(config.clone(), &buffer[0..fft_res].to_vec());
-                            audio_data.fft();
-                            audio_data.distribute_volume();
-                            audio_data.cut_off();
-                            audio_data.normalize();
-                            audio_data.smooth();
-                            audio_data.apply_resolution();
+                            audio_data.compute_all();
 
                             let c_b = audio_data.buffer;
 
@@ -62,7 +57,7 @@ impl AudioStream {
 
                             // remove already calculated parts
                             //buffer.drain(0..config.fft_resolution);
-                            buffer.drain(0..config.fft_resolution / 2); // overlapping
+                            buffer.drain(0.. (config.fft_resolution as f32 * config.pre_fft_buffer_cutoff) as usize ); // overlapping
                         }
                     },
                     Event::RequestData(sender) => {
@@ -137,11 +132,9 @@ impl AudioStream {
 
     pub fn set_bar_number(&self, number: usize) {
         let config = self.get_config();
-        let current_bars: f32 = config.fft_resolution as f32 * 0.25 * (config.max_frequency as f32 / 20_000.0);
-        let wanted_res: f32 = number as f32 / current_bars;
-
+        
         let wanted_conf = Config {
-            resolution: wanted_res,
+            bar_count: number,
             ..config
         };
 
