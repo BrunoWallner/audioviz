@@ -1,23 +1,24 @@
 # audioviz
-A modular and simple libary to make raw and realtime audiodata captured for example from [cpal](https://github.com/RustAudio/cpal) visually more appealing.
+A modular and simple libary to make raw and realtime audiodata visually more appealing.
 
-It is not intended for scientifically usecases.
+It is not intended for scientific usecases.
 
-## demo
-[simple implementation](https://github.com/BrunoWallner/audiovis)
-[more advanced implementation](https://github.com/BrunoWallner/audiolizer)
+## implementations
+* [audiovis](https://github.com/BrunoWallner/audiovis)
+* [audiolizer](https://github.com/BrunoWallner/audiolizer)
+* [crav](https://github.com/BrunoWallner/crav)
 
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
-* configuration that can be live modified at runtime
-* buffering for smoothing over time
+* configuration that can be modified at runtime
+* buffering for time smoothing
 * smoothing
-* resolution control
+* configurable amount of 'bars'
 * configurable refresh rate
-* configurable FFT and output resolution
+* configurable FFT resolution
 * very simple "interface"
 * multithreaded event based approach
-* should be able to be implemented in any project
+* should be possible to implement in any project
 
 ## Example with cpal
 ```rs
@@ -27,7 +28,7 @@ use std::sync::mpsc;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 fn main() {
-    // creates the AudioStream object, which handles the interface
+    // creates the AudioStream object, which is the main interface
     let audio_stream = AudioStream::init(
         // using the default configuration
         Config {
@@ -39,7 +40,6 @@ fn main() {
     let event_sender = audio_stream.get_event_sender();
 
     // initiating the audio sending thread, that captures audio using cpal and then sends it to audio_stream via the event_sender
-    // I actually dont fully know how to use cpal so it could be partially wrong but it works at least a bit
     let event_sender_clone = event_sender.clone();
     thread::spawn(move || {
         let host = cpal::default_host();
