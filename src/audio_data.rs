@@ -72,7 +72,7 @@ impl AudioData {
                     *val *= percentage * 2.0;
                 }
             }
-            VolumeNormalisation::Exponentially => {
+            VolumeNormalisation::Exponential => {
                 let buf_len = self.buffer.len();
                 for (i, val) in self.buffer.iter_mut().enumerate() {
                     let offset: f32 = (buf_len as f32 / (i + 1) as f32).powf(0.5);
@@ -89,12 +89,9 @@ impl AudioData {
         let mut pos_index: Vec<(usize, f32)> = Vec::new();
     
         for i in 0..self.buffer.len() {
-            let offset: f32 = (self.buffer.len() as f32 / (i + 1) as f32).powf(0.5);
-    
-            if ((i as f32 * offset) as usize) < self.buffer.len() {
-                // space normalisation and space distribution
-                let pos = (i as f32 * offset) as usize;
-    
+            // space normalisation and space distribution
+            let pos = self.normalized_pos(i);
+            if pos < self.buffer.len() {
                 // volume normalisation
                 //let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).powf(0.5);
                 //let y = buffer[i] / volume_offset.powi(3) * 0.01;
@@ -196,7 +193,7 @@ impl AudioData {
     }
 
     fn normalized_pos(&self, linear_pos: usize) -> usize {
-        let offset: f32 = (self.buffer.len() as f32 / (linear_pos + 1) as f32).powf(0.5);
+        let offset: f32 = (self.buffer.len() as f32 / (linear_pos + 1) as f32).powf(self.config.distribution);
         (linear_pos as f32 * offset) as usize
     }
 }
