@@ -1,6 +1,6 @@
 [package]
 name = "audioviz"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Luca <b.lucab1211@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -16,3 +16,4 @@ categories = ["multimedia::audio"]
 rustfft = "6.0.1"
 apodize = "1.0.0"
 splines = "4.0.3"
+serde = { version = "1.0.130", features = ["derive"]}

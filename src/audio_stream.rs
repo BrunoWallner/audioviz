@@ -56,8 +56,11 @@ impl AudioStream {
                             };
 
                             // remove already calculated parts
-                            //buffer.drain(0..config.fft_resolution);
-                            buffer.drain(0.. (config.fft_resolution as f32 * config.pre_fft_buffer_cutoff) as usize ); // overlapping
+                            let cutoff: f32 = match config.pre_fft_buffer_cutoff {
+                                d if (0.0..=1.0).contains(&d) => d,
+                                _ => 0.5,
+                            };
+                            buffer.drain(0.. (config.fft_resolution as f32 * cutoff) as usize ); // overlapping
                         }
                     },
                     Event::RequestData(sender) => {
