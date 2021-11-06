@@ -15,7 +15,6 @@ impl AudioData {
         }
     }
 
-    #[no_mangle]
     pub fn compute_all(&mut self) {
         self.fft();
         self.distribute_volume();
@@ -25,7 +24,6 @@ impl AudioData {
         self.apply_bar_count();
     }
 
-    #[no_mangle]
     pub fn fft(&mut self) {
         let i_buf = apodize(&self.buffer[..]);
 
@@ -48,7 +46,6 @@ impl AudioData {
         self.buffer = self.buffer[0..(self.buffer.len() as f32 * 0.25) as usize].to_vec();
     }
 
-    #[no_mangle]
     pub fn distribute_volume(&mut self) {
         match &self.config.volume_normalisation {
             VolumeNormalisation::None => (),
@@ -61,13 +58,12 @@ impl AudioData {
         }
     }
 
-    #[no_mangle]
     pub fn normalize(&mut self) {
         let mut pos_index: Vec<(usize, f32)> = Vec::new();
     
         for i in 0..self.buffer.len() {
             // space normalisation and space distribution
-            let pos = self.normalized_pos(i, self.buffer.len());
+            let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
             if pos < self.buffer.len() {
                 // volume normalisation
                 //let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).powf(0.5);
@@ -94,28 +90,25 @@ impl AudioData {
         }
     }
 
-    #[no_mangle]
-    #[inline]
     pub fn cut_off(&mut self) {
         let start_percentage: f32 = self.config.frequency_bounds[0] as f32 / 22_500_f32;
         let start_pos = self.normalized_pos(
-            (self.buffer.len() as f32 * start_percentage) as usize,
+            self.buffer.len() as f32 * start_percentage,
             self.buffer.len(),
-        );
+        ) as usize;
 
 
         let end_percentage: f32 = self.config.frequency_bounds[1] as f32 / 22_500_f32;
         let end_pos = self.normalized_pos(
-            (self.buffer.len() as f32 * end_percentage) as usize,
+            self.buffer.len() as f32 * end_percentage,
             self.buffer.len(),
-        );
+        ) as usize;
 
         if start_pos < self.buffer.len() && end_pos < self.buffer.len() && start_pos < end_pos {
             self.buffer = self.buffer[start_pos..end_pos].to_vec();
         }
     }
 
-    #[no_mangle]
     pub fn smooth(&mut self) {
         if !(self.buffer.len() <= self.config.smoothing_size || self.config.smoothing_size == 0) {
             for _ in 0..self.config.smoothing_amount {
@@ -138,27 +131,10 @@ impl AudioData {
         }
     }
 
-    #[no_mangle]
     #[allow(clippy::collapsible_if)]
     pub fn apply_bar_count(&mut self) {
-        let start_percentage: f32 = self.config.frequency_bounds[0] as f32 / 22_500_f32;
-        let start_pos = self.normalized_pos(
-            (self.buffer.len() as f32 * start_percentage) as usize,
-            self.buffer.len(),
-        );
-
-        let end_percentage: f32 = self.config.frequency_bounds[1] as f32 / 22_500_f32;
-        let end_pos = self.normalized_pos(
-            (self.buffer.len() as f32 * end_percentage) as usize,
-            self.buffer.len(),
-        );
-
-        let norm_pos = end_pos - start_pos;
-
-        let current_bars: f32 = self.config.fft_resolution as f32 * 0.25 * (norm_pos as f32 / self.buffer.len() as f32);
+        let current_bars: f32 = self.buffer.len() as f32;
         let resolution: f32 = self.config.bar_count as f32 / current_bars;
-
-        //println!("\n\n\n {}, {}, {} \n\n\n", resolution, norm_pos, current_bars);
 
         let mut output_buffer: Vec<f32> = vec![0.0; (self.buffer.len() as f32 * resolution) as usize];
 
@@ -189,15 +165,6 @@ impl AudioData {
                     }
                 }
             }
-            /*
-            let offset = self.buffer.len() as f32 / output_buffer.len() as f32;
-            for (i, val) in output_buffer.iter_mut().enumerate() {
-                let pos = (i as f32 * offset) as usize;
-                if pos < self.buffer.len() {
-                    *val = (*val + self.buffer[pos]) * 0.5;
-                }
-            }
-            */
     
             self.buffer = output_buffer;
         }
@@ -205,14 +172,13 @@ impl AudioData {
         } 
     }
 
-    #[no_mangle]
-    fn normalized_pos(&self, linear_pos: usize, buf_len: usize) -> usize {
-        let offset: f32 = (buf_len as f32 / (linear_pos + 1) as f32).powf(self.config.distribution);
-        (linear_pos as f32 * offset) as usize
+    #[inline]
+    fn normalized_pos(&self, linear_pos: f32, buf_len: usize) -> f32 {
+        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(self.config.distribution);
+        linear_pos * offset
     }
 }
 
-#[no_mangle]
 fn apodize(buffer: &[f32]) -> Vec<f32> {
     let window = apodize::hanning_iter(buffer.len()).collect::<Vec<f64>>();
 
