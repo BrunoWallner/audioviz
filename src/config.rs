@@ -9,7 +9,7 @@ pub struct Config {
     pub fft_resolution: usize,
     pub refresh_rate: usize,
     pub bar_count: usize,
-    pub max_frequency: usize,
+    pub frequency_bounds: [usize; 2],
     pub volume: f32,
     pub volume_normalisation: VolumeNormalisation,
 
@@ -31,9 +31,9 @@ impl Default for Config {
             fft_resolution: 1024 * 8,
             refresh_rate: 60,
             bar_count: 200,
-            max_frequency: 5_000,
+            frequency_bounds: [20, 5000],
             volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Exponential,
+            volume_normalisation: VolumeNormalisation::Linear(1.125),
             pre_fft_buffer_cutoff: 0.33,
             distribution: 0.5,
         }
@@ -43,7 +43,6 @@ impl Default for Config {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug, Clone)]
 pub enum VolumeNormalisation {
-    Manual(Vec<f32>),   // one good would look like this: [0.01, 0.1, 1.0, 1.0,  2.0]
-    Linear,
-    Exponential,
+    None,
+    Linear(f32),
 }
