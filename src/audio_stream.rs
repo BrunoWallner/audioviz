@@ -26,8 +26,13 @@ impl AudioStream {
             //let (event_sender, event_receiver) = mpsc::channel();
             let mut buffer: Vec<f32> = Vec::new();
             let mut calculated_buffer: Vec<f32> = Vec::new();
-            let mut smoothing_buffer: Vec<Vec<f32>> = Vec::new();
-            let mut smoothed_buffer: Vec<f32> = Vec::new();
+
+            let mut buffering_buffer: Vec<Vec<f32>> = Vec::new();
+            let mut buffered_buffer: Vec<f32>;
+
+            let mut gravity_buffer: Vec<f32> = Vec::new();
+            let mut gravity_time_buffer: Vec<u32> = Vec::new();
+
             let mut config: Config = config;
     
             loop  {
@@ -40,14 +45,6 @@ impl AudioStream {
                             audio_data.compute_all();
 
                             let c_b = audio_data.buffer;
-
-                            /*
-                            let c_b = 
-                                convert_buffer(
-                                    &buffer[0..fft_res].to_vec(),
-                                    &config,
-                                );
-                            */
                             
                             calculated_buffer = if !calculated_buffer.is_empty() {
                                 merge_buffers(&vec![calculated_buffer, c_b])
@@ -64,19 +61,43 @@ impl AudioStream {
                         }
                     },
                     Event::RequestData(sender) => {
-                        sender.send(smoothed_buffer.clone()).expect("audio thread lost connection to bridge");
+                        sender.send(gravity_buffer.clone()).expect("audio thread lost connection to bridge");
                     }
                     Event::RequestRefresh => {
+                        /* Buffering */
                         if !calculated_buffer.is_empty() {
-                            smoothing_buffer.push(calculated_buffer.clone());
+                            buffering_buffer.push(calculated_buffer.clone());
                         }
-                        smoothed_buffer = if !smoothing_buffer.is_empty() {
-                            merge_buffers(&smoothing_buffer)
+                        buffered_buffer = if !buffering_buffer.is_empty() {
+                            merge_buffers(&buffering_buffer)
                         } else {
                             Vec::new()
                         };
-                        while smoothing_buffer.len() > config.buffering {
-                            smoothing_buffer.remove(0);
+                        while buffering_buffer.len() > config.buffering {
+                            buffering_buffer.remove(0);
+                        }
+
+                        /* Grafity */
+                        if gravity_buffer.len() != buffered_buffer.len() {
+                            gravity_buffer = vec![0.0; buffered_buffer.len()];
+                        }
+                        if gravity_time_buffer.len() != buffered_buffer.len() {
+                            gravity_time_buffer = vec![0; buffered_buffer.len()];
+                        }
+
+                        // applies up velocity
+                        for i in 0..buffered_buffer.len() {
+                            if gravity_buffer[i] < buffered_buffer[i] {
+                                gravity_buffer[i] = buffered_buffer[i];
+                                gravity_time_buffer[i] = 0;
+                            } else {
+                                gravity_time_buffer[i] += 1;
+                            }
+                        }
+
+                        // apply gravity to buffer
+                        for (i, v) in gravity_buffer.iter_mut().enumerate() {
+                            *v -= config.gravity * 0.025 * (gravity_time_buffer[i] as f32 * 0.025 );
                         }
                     }
                     Event::RequestConfig(sender) => {
