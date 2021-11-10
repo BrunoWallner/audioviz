@@ -3,7 +3,6 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize)]
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub buffering: usize,
     pub smoothing_size: usize,
     pub smoothing_amount: usize,
     pub fft_resolution: usize,
@@ -20,22 +19,26 @@ pub struct Config {
 
     // higher means more space for bass freqs
     // should be in between 0.1 and 1.0
-    pub distribution: f32,
+    pub distribution: Vec<f32>,
+
+    pub gravity: f32,
+    pub buffering: usize,
 }
 impl Default for Config {
     fn default() -> Self {
         Config { 
-            buffering: 7,
-            smoothing_size: 2,
-            smoothing_amount: 2,
+            smoothing_size: 10,
+            smoothing_amount: 10,
             fft_resolution: 1024 * 8,
             refresh_rate: 60,
             bar_count: 200,
-            frequency_bounds: [20, 5000],
+            frequency_bounds: [30, 5000],
             volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Linear(1.125),
+            volume_normalisation: VolumeNormalisation::Linear(0.85),
             pre_fft_buffer_cutoff: 0.33,
-            distribution: 0.5,
+            distribution: vec![1.0, 1.0, 1.0, 1.0],
+            gravity: 5.0,
+            buffering: 7,
         }
     }
 }

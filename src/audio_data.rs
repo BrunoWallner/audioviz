@@ -174,7 +174,7 @@ impl AudioData {
 
     #[inline]
     fn normalized_pos(&self, linear_pos: f32, buf_len: usize) -> f32 {
-        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(self.config.distribution);
+        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5);
         linear_pos * offset
     }
 }
