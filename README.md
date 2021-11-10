@@ -9,7 +9,7 @@ It is not intended for scientific usecases.
 * [crav](https://github.com/BrunoWallner/crav)
 
 ## Features
-* Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
+* Fast Fourier transform via [RustFFT](https://github.com/ejmahler/RustFFT) with space and volume normalisation
 * configuration that can be modified at runtime
 * buffering for time smoothing
 * smoothing
