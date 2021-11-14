@@ -21,8 +21,7 @@ pub struct Config {
     // should be in between 0.1 and 1.0
     pub distribution: Vec<f32>,
 
-    pub gravity: f32,
-    pub buffering: usize,
+    pub gravity: Option<f32>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -37,8 +36,7 @@ impl Default for Config {
             volume_normalisation: VolumeNormalisation::Linear(0.85),
             pre_fft_buffer_cutoff: 0.33,
             distribution: vec![1.0, 1.0, 1.0, 1.0],
-            gravity: 5.0,
-            buffering: 7,
+            gravity: None,
         }
     }
 }

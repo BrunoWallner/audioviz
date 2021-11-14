@@ -16,6 +16,7 @@ impl AudioData {
     }
 
     pub fn compute_all(&mut self) {
+        self.apodize();
         self.fft();
         self.distribute_volume();
         self.normalize();
@@ -24,14 +25,23 @@ impl AudioData {
         self.apply_bar_count();
     }
 
-    pub fn fft(&mut self) {
-        let i_buf = apodize(&self.buffer[..]);
+    pub fn apodize(&mut self) {
+        let window = apodize::hanning_iter(self.buffer.len()).collect::<Vec<f64>>();
+    
+        let mut output_buffer: Vec<f32> = Vec::new();
+    
+        for i in 0..self.buffer.len() {
+            output_buffer.push(window[i] as f32 * self.buffer[i]);
+        }
+        self.buffer = output_buffer
+    }
 
+    pub fn fft(&mut self) {
         let mut planner = FftPlanner::new();
-        let fft = planner.plan_fft_forward(i_buf.len());
+        let fft = planner.plan_fft_forward(self.buffer.len());
     
         let mut buffer: Vec<Complex<f32>> = Vec::new();
-        for i in i_buf.iter() {
+        for i in self.buffer.iter() {
             buffer.push(Complex {
                 re: *i,
                 im: *i,
@@ -174,46 +184,33 @@ impl AudioData {
 
     #[inline]
     fn normalized_pos(&self, linear_pos: f32, buf_len: usize) -> f32 {
-        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5);
+        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.7);
         linear_pos * offset
     }
-}
-
-fn apodize(buffer: &[f32]) -> Vec<f32> {
-    let window = apodize::hanning_iter(buffer.len()).collect::<Vec<f64>>();
-
-    let mut output_buffer: Vec<f32> = Vec::new();
-
-    for i in 0..buffer.len() {
-        output_buffer.push(window[i] as f32 * buffer[i]);
-    }
-    output_buffer
 }
 
 // combines 2-dimensional buffer (Vec<Vec<f32>>) into a 1-dimensional one that has the average value of the 2D buffer
 // EVERY 1D buffer of whole buffer MUST have the same length, but the current implementation guarantees this, considering the resolution stays the same
 // if size changes you have to call 'Event::ClearBuffer'
+/*
 #[allow(clippy::ptr_arg)]
 pub fn merge_buffers(
     buffer: &Vec<Vec<f32>>, // EVERY 1D buffer of whole buffer MUST have the same length
 ) -> Vec<f32> {
-    let mut smoothed_percentage: f32 = 0.0;
     let mut output_buffer: Vec<f32> = vec![0.0; buffer[0].len()];
-    for (pos_z, z_buffer) in buffer.iter().enumerate() {
-        // needed for weighting the Importance of earch z_buffer, more frequent -> more important
-        // should decrease latency and increase overall responsiveness
-        let percentage: f32 = (pos_z + 1) as f32 / buffer.len() as f32;
-        smoothed_percentage += percentage;
+    for z_buffer in buffer.iter() {
         for (pos_x, value) in z_buffer.iter().enumerate() {
             if pos_x < output_buffer.len() {
-                output_buffer[pos_x] += value * percentage;
+                output_buffer[pos_x] += value;
             }
         }
     }
 
+
     for b in output_buffer.iter_mut() {
-        *b /= smoothed_percentage;
+        *b /= 2.0;
     }
 
     output_buffer
 }
+*/

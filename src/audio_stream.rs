@@ -10,7 +10,6 @@ pub enum Event {
     RequestConfig(mpsc::Sender<Config>),
     SendConfig(Config),
     RequestRefresh,
-    ClearBuffer,
 }
 
 pub struct AudioStream {
@@ -23,12 +22,8 @@ impl AudioStream {
         // thread that receives Events, converts and processes the received data 
         // and sends it via a mpsc channel to requesting to thread that requested processed data
         thread::spawn(move || {
-            //let (event_sender, event_receiver) = mpsc::channel();
             let mut buffer: Vec<f32> = Vec::new();
-            let mut calculated_buffer: Vec<f32> = Vec::new();
-
-            let mut buffering_buffer: Vec<Vec<f32>> = Vec::new();
-            let mut buffered_buffer: Vec<f32>;
+            let mut buffered_buffer: Vec<f32> = Vec::new();
 
             let mut gravity_buffer: Vec<f32> = Vec::new();
             let mut gravity_time_buffer: Vec<u32> = Vec::new();
@@ -39,31 +34,33 @@ impl AudioStream {
                 match event_receiver.recv().unwrap() {
                     Event::SendData(mut b) => {
                         buffer.append(&mut b);
-                        let fft_res = config.fft_resolution;
+                        let fft_res: usize = config.fft_resolution;
                         while buffer.len() > fft_res {
                             let mut audio_data = AudioData::new(config.clone(), &buffer[0..fft_res].to_vec());
                             audio_data.compute_all();
 
-                            let c_b = audio_data.buffer;
-                            
-                            calculated_buffer = if !calculated_buffer.is_empty() {
-                                merge_buffers(&vec![calculated_buffer, c_b])
-                            } else {
-                                c_b
-                            };
+                            buffered_buffer = audio_data.buffer;
 
                             // remove already calculated parts
                             let cutoff: f32 = match config.pre_fft_buffer_cutoff {
                                 d if (0.0..=1.0).contains(&d) => d,
                                 _ => 0.5,
                             };
-                            buffer.drain(0.. (config.fft_resolution as f32 * cutoff) as usize ); // overlapping
+                            buffer.drain(0.. (fft_res as f32 * cutoff) as usize ); // overlapping
                         }
                     },
                     Event::RequestData(sender) => {
-                        sender.send(gravity_buffer.clone()).expect("audio thread lost connection to bridge");
+                        match config.gravity {
+                            Some(_) => {
+                                sender.send(gravity_buffer.clone()).expect("audio thread lost connection to bridge");
+                            }
+                            None => {
+                                sender.send(buffered_buffer.clone()).expect("audio thread lost connection to bridge");
+                            }
+                        }
                     }
                     Event::RequestRefresh => {
+                        /*
                         /* Buffering */
                         if !calculated_buffer.is_empty() {
                             buffering_buffer.push(calculated_buffer.clone());
@@ -76,28 +73,34 @@ impl AudioStream {
                         while buffering_buffer.len() > config.buffering {
                             buffering_buffer.remove(0);
                         }
+                        */
 
                         /* Grafity */
-                        if gravity_buffer.len() != buffered_buffer.len() {
-                            gravity_buffer = vec![0.0; buffered_buffer.len()];
-                        }
-                        if gravity_time_buffer.len() != buffered_buffer.len() {
-                            gravity_time_buffer = vec![0; buffered_buffer.len()];
-                        }
-
-                        // applies up velocity
-                        for i in 0..buffered_buffer.len() {
-                            if gravity_buffer[i] < buffered_buffer[i] {
-                                gravity_buffer[i] = buffered_buffer[i];
-                                gravity_time_buffer[i] = 0;
-                            } else {
-                                gravity_time_buffer[i] += 1;
-                            }
-                        }
-
-                        // apply gravity to buffer
-                        for (i, v) in gravity_buffer.iter_mut().enumerate() {
-                            *v -= config.gravity * 0.025 * (gravity_time_buffer[i] as f32 * 0.025 );
+                        match config.gravity {
+                            Some(gravity) => {
+                                if gravity_buffer.len() != buffered_buffer.len() {
+                                    gravity_buffer = vec![0.0; buffered_buffer.len()];
+                                }
+                                if gravity_time_buffer.len() != buffered_buffer.len() {
+                                    gravity_time_buffer = vec![0; buffered_buffer.len()];
+                                }
+        
+                                // applies up velocity
+                                for i in 0..buffered_buffer.len() {
+                                    if gravity_buffer[i] < buffered_buffer[i] {
+                                        gravity_buffer[i] = buffered_buffer[i];
+                                        gravity_time_buffer[i] = 0;
+                                    } else {
+                                        gravity_time_buffer[i] += 1;
+                                    }
+                                }
+        
+                                // apply gravity to buffer
+                                for (i, v) in gravity_buffer.iter_mut().enumerate() {
+                                    *v -= gravity * 0.0025 * (gravity_time_buffer[i] as f32 );
+                                }
+                            },
+                            None => (),
                         }
                     }
                     Event::RequestConfig(sender) => {
@@ -105,9 +108,6 @@ impl AudioStream {
                     }
                     Event::SendConfig(c) => {
                         config = c;
-                    }
-                    Event::ClearBuffer => {
-                        calculated_buffer = Vec::new();
                     }
                 }
             }
@@ -163,8 +163,6 @@ impl AudioStream {
         };
 
         self.event_sender.send(Event::SendConfig(wanted_conf)).unwrap();
-        self.event_sender.send(Event::ClearBuffer).unwrap();
-
     }
 
     pub fn get_config(&self) -> Config {
