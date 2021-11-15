@@ -1,5 +1,5 @@
-mod audio_stream;
 mod audio_data;
+mod audio_stream;
 mod config;
 
 pub use audio_stream::AudioStream;

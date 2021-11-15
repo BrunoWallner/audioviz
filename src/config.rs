@@ -1,7 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub smoothing_size: usize,
     pub smoothing_amount: usize,
@@ -17,32 +16,28 @@ pub struct Config {
     // MUST be in between 0 and 1
     pub pre_fft_buffer_cutoff: f32,
 
-    // higher means more space for bass freqs
-    // should be in between 0.1 and 1.0
-    pub distribution: Vec<f32>,
-
+    pub eq: Vec<f32>,
     pub gravity: Option<f32>,
 }
 impl Default for Config {
     fn default() -> Self {
-        Config { 
-            smoothing_size: 10,
-            smoothing_amount: 10,
-            fft_resolution: 1024 * 8,
+        Config {
+            smoothing_size: 1,
+            smoothing_amount: 1,
+            fft_resolution: 1024 * 4,
             refresh_rate: 60,
             bar_count: 200,
-            frequency_bounds: [30, 5000],
+            frequency_bounds: [30, 10000],
             volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Linear(0.85),
-            pre_fft_buffer_cutoff: 0.33,
-            distribution: vec![1.0, 1.0, 1.0, 1.0],
-            gravity: None,
+            volume_normalisation: VolumeNormalisation::Linear(0.65),
+            pre_fft_buffer_cutoff: 0.5,
+            eq: vec![1.0, 1.0, 1.0, 1.0],
+            gravity: Some(1.0),
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum VolumeNormalisation {
     None,
     Linear(f32),
