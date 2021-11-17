@@ -81,7 +81,7 @@ impl AudioStream {
                                     gravity_time_buffer = vec![0; current_buffer.len()];
                                 }
 
-                                // applies up velocity
+                                // sets value of gravity_buffer to current_buffer if current_buffer is higher
                                 for i in 0..current_buffer.len() {
                                     if gravity_buffer[i] < current_buffer[i] {
                                         gravity_buffer[i] = current_buffer[i];

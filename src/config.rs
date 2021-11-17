@@ -16,7 +16,7 @@ pub struct Config {
     // MUST be in between 0 and 1
     pub pre_fft_buffer_cutoff: f32,
 
-    pub eq: Vec<f32>,
+    pub eq: Vec<( [usize; 2], f32 )>,
     pub gravity: Option<f32>,
 }
 impl Default for Config {
@@ -24,14 +24,15 @@ impl Default for Config {
         Config {
             smoothing_size: 1,
             smoothing_amount: 1,
-            fft_resolution: 1024 * 4,
+            fft_resolution: 1024 * 8,
             refresh_rate: 60,
+
             bar_count: 200,
             frequency_bounds: [30, 10000],
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
             pre_fft_buffer_cutoff: 0.5,
-            eq: vec![1.0, 1.0, 1.0, 1.0],
+            eq: vec![ ( [30, 200], 100.0 ), ( [200, 2500], 50.0 ) ],
             gravity: Some(1.0),
         }
     }
