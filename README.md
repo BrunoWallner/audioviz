@@ -4,9 +4,9 @@ A modular and simple libary to make raw and realtime audiodata visually more app
 It is not intended for scientific usecases.
 
 ## implementations
+* [crav](https://github.com/BrunoWallner/crav)
 * [audiovis](https://github.com/BrunoWallner/audiovis)
 * [audiolizer](https://github.com/BrunoWallner/audiolizer)
-* [crav](https://github.com/BrunoWallner/crav)
 
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
