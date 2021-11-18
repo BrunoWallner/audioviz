@@ -1,5 +1,5 @@
 # audioviz
-A modular and simple libary to make raw and realtime audiodata visually more appealing.
+A modular and simple libary to make raw audiodata visually more appealing in realtime.
 
 It is not intended for scientific usecases.
 
@@ -13,6 +13,7 @@ It is not intended for scientific usecases.
 * configuration that can be modified at runtime
 * configurable amount of 'bars'
 * configurable refresh rate
+* eq that allows you to manually distribute frequency ranges
 * configurable FFT resolution
 * very simple "interface"
 * multithreaded event based approach
