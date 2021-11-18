@@ -7,15 +7,8 @@ pub struct Config {
     pub fft_resolution: usize,
     pub refresh_rate: usize,
     pub bar_count: usize,
-    pub frequency_bounds: [usize; 2],
     pub volume: f32,
     pub volume_normalisation: VolumeNormalisation,
-
-    // higher means less latency but combined with high fft_resolution it will look bad
-    // should be decreased with higher fft resolutions
-    // MUST be in between 0 and 1
-    pub pre_fft_buffer_cutoff: f32,
-
     pub eq: Vec<( [usize; 2], f32 )>,
     pub gravity: Option<f32>,
 }
@@ -24,20 +17,18 @@ impl Default for Config {
         Config {
             smoothing_size: 1,
             smoothing_amount: 1,
-            fft_resolution: 1024 * 8,
+            fft_resolution: 1024 * 4,
             refresh_rate: 60,
-
             bar_count: 200,
-            frequency_bounds: [30, 10000],
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            pre_fft_buffer_cutoff: 0.5,
-            eq: vec![ ( [30, 200], 100.0 ), ( [200, 2500], 50.0 ) ],
-            gravity: Some(1.0),
+            eq: vec![ ( [0, 100], 200.0 ), ( [100, 200], 100.0 ), ( [200, 2500], 200.0 ) ],
+            gravity: Some(2.0),
         }
     }
 }
 
+// I know it can be replaced with Option<>, but I want to add things in the future
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum VolumeNormalisation {
     None,

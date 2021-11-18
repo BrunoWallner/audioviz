@@ -11,8 +11,6 @@ It is not intended for scientific usecases.
 ## Features
 * Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
 * configuration that can be modified at runtime
-* buffering for time smoothing
-* smoothing
 * configurable amount of 'bars'
 * configurable refresh rate
 * configurable FFT resolution
@@ -46,7 +44,12 @@ fn main() {
 
         let device = host.default_output_device().unwrap();
 
-        let device_config =  device.default_output_config().unwrap();
+        // as of version 3.1 it must be 1 channel
+        let device_config = cpal::StreamConfig {
+            channels: 1,
+            sample_rate: cpal::SampleRate(44_100),
+            buffer_size: cpal::BufferSize::Fixed(1000)
+        };
 
         let stream = match device_config.sample_format() {
             cpal::SampleFormat::F32 => device.build_input_stream(
@@ -91,4 +94,4 @@ fn err_fn(err: cpal::StreamError) {
 }
 ```
 
-The received data is stored via `Vec<f32>`
+The received data is stored in a vector of 32 bit floating points, arranged in ascending frequencies.

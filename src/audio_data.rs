@@ -50,7 +50,7 @@ impl AudioData {
             self.buffer[i] = val.norm();
         }
         // remove mirroring
-        self.buffer = self.buffer[0..(self.buffer.len() as f32 * 0.25) as usize].to_vec();
+        self.buffer = self.buffer[0..(self.buffer.len() as f32 * 0.5 ) as usize].to_vec();
     }
 
     pub fn distribute_volume(&mut self) {
@@ -124,7 +124,7 @@ impl AudioData {
 
     }
 
-    #[allow(dead_code)] // needs to be changed because of change in normalize function
+    /* needs to be changed because of change in normalize function
     pub fn cut_off(&mut self) {
         let start_percentage: f32 = self.config.frequency_bounds[0] as f32 / 22_500_f32;
         let start_pos = self.normalized_pos(
@@ -141,6 +141,7 @@ impl AudioData {
             self.buffer = self.buffer[start_pos..end_pos].to_vec();
         }
     }
+    */
 
     pub fn smooth(&mut self) {
         if !(self.buffer.len() <= self.config.smoothing_size || self.config.smoothing_size == 0) {
