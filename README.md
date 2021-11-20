@@ -52,16 +52,11 @@ fn main() {
             buffer_size: cpal::BufferSize::Fixed(1000)
         };
 
-        let stream = match device_config.sample_format() {
-            cpal::SampleFormat::F32 => device.build_input_stream(
-                &device_config.into(),
-                move |data, _: &_| handle_input_data_f32(data, event_sender_clone.clone()),
-                err_fn,
-            ).unwrap(),
-            other => {
-                panic!("Unsupported sample format {:?}", other);
-            }
-        };
+        let stream = device.build_input_stream(
+            &device_config.into(),
+            move |data, _: &_| handle_input_data_f32(data, event_sender.clone()),
+            err_fn,
+        ).unwrap();
 
         stream.play().unwrap();
 
