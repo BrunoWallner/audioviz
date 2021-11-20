@@ -9,7 +9,7 @@ It is not intended for scientific usecases.
 * [audiolizer](https://github.com/BrunoWallner/audiolizer)
 
 ## Features
-* Fast Fourier transform via [RustFFT](https://github.com/awelkie/RustFFT) with space and volume normalisation
+* Fast Fourier transform via [RustFFT](https://github.com/ejmahler/RustFFT) with space and volume normalisation
 * configuration that can be modified at runtime
 * configurable amount of 'bars'
 * configurable refresh rate
