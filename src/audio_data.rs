@@ -66,82 +66,64 @@ impl AudioData {
     }
 
     pub fn normalize_and_eq(&mut self) {
-        let mut pos_index: Vec<(f32, usize, f32)> = Vec::new(); // freq, norm_freq, value
+        let mut pos_index: Vec<(f32, f32, f32)> = Vec::new(); // freq, norm_offset, y_value
 
         for i in 0..self.buffer.len() {
             // space normalisation and space distribution
-            let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
-            if pos < self.buffer.len() {
-                // volume normalisation
-                //let volume_offset: f32 = (output_buffer.len() as f32 / (pos + 1) as f32).powf(0.5);
-                //let y = buffer[i] / volume_offset.powi(3) * 0.01;
-                let y = self.buffer[i] * 0.01;
+            //let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
+            let norm_offset: f32 = self.normalized_offset(i as f32, self.buffer.len());
+            let y = self.buffer[i] * 0.05;
 
-                let freq: f32 = ((i + 1) as f32 / self.buffer.len() as f32) * 22_500_f32;
-                pos_index.push((freq, pos, y));
-            }
+            let freq: f32 = ((i + 1) as f32 / self.buffer.len() as f32) * (self.config.sample_rate as f32) / 2.0;
+            pos_index.push((freq, norm_offset, y));
         }
 
         // Interpolation and eq
         let mut points: Vec<Key<f32, f32>> = Vec::new();
-        let mut final_x: f32 = 0.0; // It needs to be declared outside of loop, because I later need max x position
-        let mut abs_offset: f32 = 0.0;
+        let mut eq_pointer: f32 = 0.0;
+        let mut abs_pointer: f32 = 0.0;
+    
+        let eq_spline = get_eq_spline(&self.config);
+
         for val in pos_index.iter() {
             let freq = val.0;
-            let x = val.1 as f32;
+            let norm_offset = val.1 as f32;
             let y = val.2 * self.config.volume;
 
-            // eq distribution
-            let x_eq_offset: f32 = get_eq_offset(&self.config.eq, freq);
-            final_x = x * x_eq_offset + abs_offset;
+            // freq bound cuttoff bc of if statements
+            if (self.config.frequency_bounds[0] as f32) < freq {
+                if (self.config.frequency_bounds[1] as f32) > freq {
+                    let eq_offset = get_eq_offset(&eq_spline, freq);
+                    eq_pointer += eq_offset;
+                    abs_pointer = eq_pointer * norm_offset;
 
-            points.push(Key::new(final_x, y, Interpolation::Linear));
-
-            let dif = (x * x_eq_offset) - x;
-            abs_offset += dif;
+                    points.push(Key::new(abs_pointer, y, Interpolation::Linear));
+                }
+            }
         }
 
         let spline = Spline::from_vec(points);
 
         self.buffer.drain(..);
-        for i in 0..final_x as usize {
-            let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-            self.buffer.push(v);
-        }
 
-        fn get_eq_offset(eq: &Vec<([usize; 2], f32)>, freq: f32) -> f32 {
-            for eq in eq.iter() {
-                let start_freq = eq.0[0];
-                let end_freq = eq.0[1];
-                if freq >= start_freq as f32 && freq <= end_freq as f32 {
-                    let dif: f32 = end_freq as f32 - start_freq as f32;
-                    return eq.1 / dif + 1.0;
-                }
+        for i in 0..(abs_pointer as usize) {
+            match spline.sample(i as f32) {
+                Some(v) => self.buffer.push(v),
+                None => (),
             }
-            // if frequency is not included in eq then return default distribution value
-            1.0
         }
 
-    }
-
-    /* needs to be changed because of change in normalize function
-    pub fn cut_off(&mut self) {
-        let start_percentage: f32 = self.config.frequency_bounds[0] as f32 / 22_500_f32;
-        let start_pos = self.normalized_pos(
-            self.buffer.len() as f32 * start_percentage,
-            self.buffer.len(),
-        ) as usize;
-
-        let end_percentage: f32 = self.config.frequency_bounds[1] as f32 / 22_500_f32;
-        let end_pos = self
-            .normalized_pos(self.buffer.len() as f32 * end_percentage, self.buffer.len())
-            as usize;
-
-        if start_pos < self.buffer.len() && end_pos < self.buffer.len() && start_pos < end_pos {
-            self.buffer = self.buffer[start_pos..end_pos].to_vec();
+        fn get_eq_spline(config: &Config) -> Spline<f32, f32> {
+            let mut points: Vec<Key<f32, f32>> = Vec::new();
+            for eq in config.eq.iter() {
+                points.push(Key::new(eq.0 as f32, eq.1, Interpolation::Linear));
+            }
+            Spline::from_vec(points)
+        }
+        fn get_eq_offset(spline: &Spline<f32, f32>, freq: f32) -> f32 {
+            spline.clamped_sample(freq).unwrap_or(1.0)
         }
     }
-    */
 
     pub fn smooth(&mut self) {
         if !(self.buffer.len() <= self.config.smoothing_size || self.config.smoothing_size == 0) {
@@ -193,9 +175,13 @@ impl AudioData {
 
                 // cannot be collapsed as clippy notes i think
                 if pos < output_buffer.len() {
+                    // crambling type
                     if output_buffer[pos] < *val {
                         output_buffer[pos] = *val;
                     }
+
+                    // smoothing type
+                    //output_buffer[pos] = (output_buffer[pos] + *val) * 0.5;
                 }
             }
 
@@ -205,8 +191,7 @@ impl AudioData {
     }
 
     #[inline]
-    fn normalized_pos(&self, linear_pos: f32, buf_len: usize) -> f32 {
-        let offset: f32 = (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5);
-        linear_pos * offset
+    fn normalized_offset(&self, linear_pos: f32, buf_len: usize) -> f32 {
+        (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5)
     }
 }
