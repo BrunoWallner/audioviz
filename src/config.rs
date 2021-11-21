@@ -26,7 +26,7 @@ impl Default for Config {
             bar_count: 200,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            eq: vec![ (30, 3.0), (150, 4.0), (2000, 2.0), (5000, 1.0) ],
+            eq: vec![ (30, 1.5), (150, 2.5), (250, 2.0), (2000, 2.0), (5000, 1.0) ],
             gravity: Some(2.0),
         }
     }
