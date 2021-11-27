@@ -90,4 +90,4 @@ fn err_fn(err: cpal::StreamError) {
 }
 ```
 
-The received data is stored in a vector of 32 bit floating points, arranged in ascending frequencies.
+The received data is stored in a vector `audioviz::Frequency`, arranged in ascending frequencies.
