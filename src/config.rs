@@ -11,6 +11,7 @@ pub struct Config {
     pub volume_normalisation: VolumeNormalisation,
     pub frequency_distribution: Vec<(usize, f32)>,
     pub gravity: Option<f32>,
+    pub interpolation: Interpolation,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -24,6 +25,7 @@ impl Default for Config {
             volume_normalisation: VolumeNormalisation::Linear(0.65),
             frequency_distribution: vec![ (30, 3.0), (150, 4.0), (2000, 2.0), (5000, 1.0) ],
             gravity: Some(2.0),
+            interpolation: Interpolation::Linear,
         }
     }
 }
@@ -33,4 +35,47 @@ impl Default for Config {
 pub enum VolumeNormalisation {
     None,
     Linear(f32),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Interpolation {
+    /// Not recommended
+    /// 
+    /// All frequencies are tightly packed together without space distribution
+    /// 
+    /// This will skip distribution, so you would have to do it manually
+    None,
+
+    /// ```
+    ///           | |
+    ///           | |
+    ///       | | | |
+    ///       | | | | | |
+    ///       | | | | | |
+    /// | | | | | | | | | |
+    /// +++++++++++++++++++
+    /// ```
+    Step,
+
+    /// ``` 
+    ///           | 
+    ///         | | |  
+    ///       | | | | 
+    ///     | | | | | | | 
+    ///   | | | | | | | | 
+    /// | | | | | | | | | |
+    /// +++++++++++++++++++
+    /// ```
+    Linear,
+
+    /// ```
+    ///           |  
+    ///           |  
+    ///       |   |   | | 
+    ///       |   |   | | 
+    /// |     |   |   | | |
+    /// +++++++++++++++++++
+    /// ```
+    /// The Gaps are empty Frequencies, (`Frequency::empty()`)
+    Gaps,
 }

@@ -1,5 +1,5 @@
 use crate::audio_data::*;
-use crate::config::Config;
+use crate::config::{Config, Interpolation};
 use std::sync::mpsc;
 use std::thread;
 
@@ -79,17 +79,98 @@ impl AudioStream {
                     Event::SendData(b) => {
                         converter_sender.send(ConverterEvent::SendRawData(b)).unwrap();
                     }
-                    Event::RequestData(sender) => match config.gravity {
-                        Some(_) => {
-                            sender
-                                .send(gravity_buffer.clone())
-                                .expect("audio thread lost connection to bridge");
+                    Event::RequestData(sender) => {
+                        let buf = match config.gravity {
+                            Some(_) => {
+                                gravity_buffer.clone()
+                            }
+                            None => {
+                                current_buffer.clone()
+                            }
+                        };
+
+                        // APPLIES POSITIONS TO FREQUENCIES and interpolation
+                        // VERY IMPORTANT
+                        let buf = match config.interpolation {
+                            Interpolation::None => buf,
+                            Interpolation::Gaps => {
+                                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); buf.len()];
+                                for freq in buf.iter() {
+                                    let abs_pos = (o_buf.len() as f32 * freq.position) as usize;
+                                    if o_buf.len() > abs_pos {
+
+                                        // louder freqs are more important and shall not be overwritten by others
+                                        if freq.volume > o_buf[abs_pos].volume {
+                                            o_buf[abs_pos] = freq.clone();
+                                        }
+                                    }
+                                }
+                                o_buf
+                            },
+                            Interpolation::Step => {
+                                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); buf.len()];
+                                let mut freqs = buf.iter().peekable();
+                                'filling: loop {
+                                    let freq: &Frequency = match freqs.next() {
+                                        Some(f) => f,
+                                        None => break 'filling,
+                                    };
+                                    
+                                    let start: usize = (freq.position * o_buf.len() as f32) as usize;
+                                    let end = 
+                                    (
+                                        match freqs.peek() {
+                                            Some(f) => f.position,
+                                            None => 1.0,
+                                        } * o_buf.len() as f32
+                                    ) as usize;
+                                    
+                                    for i in start..end {
+                                        if o_buf.len() > i {
+                                            o_buf[i] = freq.clone();
+                                        }
+                                    }
+                                }
+
+                                o_buf
+                            }
+                            _ => buf
+                        };
+
+                        // freq bounds
+                        let mut start: usize = 0;
+                        let mut i: usize = 0;
+                        loop {
+                            if i >= buf.len() {
+                                break;
+                            }
+                            if buf[i].freq > config.frequency_bounds[0] as f32 {
+                                start = i;
+                                break;
+                            }
+                            i += 1;
                         }
-                        None => {
-                            sender
-                                .send(current_buffer.clone())
-                                .expect("audio thread lost connection to bridge");
+
+                        let mut end: usize = 0;
+                        let mut i: usize = 0;
+                        loop {
+                            if i >= buf.len() {
+                                break;
+                            }
+                            if buf[buf.len() - (i + 1)].freq < config.frequency_bounds[1] as f32 {
+                                end = buf.len() - i;
+                                break;
+                            }
+                            i += 1;
                         }
+
+                        let buf = buf[start..end].to_vec();
+
+                        // applies resolution
+                        let o_buf = apply_bar_count(&buf, config.bar_count);
+
+                        // finally sends buffer to request channel
+                        sender.send(o_buf).unwrap();
                     },
                     Event::RequestRefresh => {
                         // request data from converter thread
@@ -199,43 +280,32 @@ impl AudioStream {
     }
 }
 
-// combines 2-dimensional buffer (Vec<Vec<f32>>) into a 1-dimensional one that has the average value of the 2D buffer
-// EVERY 1D buffer of whole buffer MUST have the same length, but the current implementation guarantees this, considering the resolution stays the same
-// if size changes you have to call 'Event::ClearBuffer'
-/*
-#[allow(clippy::ptr_arg)]
-pub fn merge_buffers(
-    buffer: &Vec<Vec<f32>>, // EVERY 1D buffer of whole buffer MUST have the same length
-) -> Result<Vec<f32>, ()> {
-    // checks if buffers are valid
-    if buffer.len() == 0 {
-        return Err(());
-    }
-    let buf_len: usize = buffer[0].len();
-    for i in buffer.iter() {
-        if i.len() != buf_len {
-            return Err(());
-        }
-    }
 
-    let mut smoothed_percentage: f32 = 0.0;
-    let mut output_buffer: Vec<f32> = vec![0.0; buffer[0].len()];
-    for (pos_z, z_buffer) in buffer.iter().enumerate() {
-        // needed for weighting the Importance of earch z_buffer, more frequent -> more important
-        // should decrease latency and increase overall responsiveness
-        let percentage: f32 = (pos_z + 1) as f32 / buffer.len() as f32;
-        smoothed_percentage += percentage;
-        for (pos_x, value) in z_buffer.iter().enumerate() {
-            if pos_x < output_buffer.len() {
-                output_buffer[pos_x] += value * percentage;
+#[allow(clippy::collapsible_if)]
+fn apply_bar_count(buffer: &Vec<Frequency>, bar_count: usize) -> Vec<Frequency> {
+    let current_bars: f32 = buffer.len() as f32;
+    let resolution: f32 = bar_count as f32 / current_bars;
+
+    let mut output_buffer: Vec<Frequency> =
+        vec![Frequency::empty(); (buffer.len() as f32 * resolution) as usize];
+
+    if resolution < 1.0 {
+        let offset = output_buffer.len() as f32 / buffer.len() as f32;
+        for (i, freq) in buffer.iter().enumerate() {
+            let pos = (i as f32 * offset) as usize;
+
+            // cannot be collapsed as clippy notes i think
+            if pos < output_buffer.len() {
+                // crambling type
+                if output_buffer[pos].volume < freq.volume {
+                    output_buffer[pos] = Frequency {volume: freq.volume, freq: freq.freq, position: freq.position};
+                }
             }
         }
-    }
 
-    for b in output_buffer.iter_mut() {
-        *b /= smoothed_percentage;
+        output_buffer
     }
-
-    Ok(output_buffer)
+    else {
+        Vec::new()
+    }
 }
-*/
