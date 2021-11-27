@@ -2,16 +2,34 @@ use crate::config::{Config, VolumeNormalisation};
 use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
+#[derive(Clone, Debug)]
+pub struct Frequency {
+    pub volume: f32,
+    pub freq: f32,
+}
+impl Frequency {
+    pub fn empty() -> Self {
+        Frequency {volume: 0.0, freq: 0.0}
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct AudioData {
     config: Config,
-    pub buffer: Vec<f32>,
+    pub buffer: Vec<Frequency>,
 }
 
 impl AudioData {
     pub fn new(config: Config, data: &[f32]) -> Self {
+        let buf: Vec<Frequency> = 
+            data
+                .into_iter()
+                .map(|volume| Frequency {volume: *volume, freq: 0.0})
+                .collect();
+
         AudioData {
             config,
-            buffer: data.to_vec(),
+            buffer: buf,
         }
     }
 
@@ -20,20 +38,14 @@ impl AudioData {
         self.fft();
         self.distribute_volume();
         self.normalize_and_eq();
-        self.smooth();
-        //self.cut_off();
         self.apply_bar_count();
     }
 
     pub fn apodize(&mut self) {
         let window = apodize::hanning_iter(self.buffer.len()).collect::<Vec<f64>>();
-
-        let mut output_buffer: Vec<f32> = Vec::new();
-
         for i in 0..self.buffer.len() {
-            output_buffer.push(window[i] as f32 * self.buffer[i]);
+            self.buffer[i].volume *= window[i] as f32;
         }
-        self.buffer = output_buffer
     }
 
     pub fn fft(&mut self) {
@@ -41,13 +53,13 @@ impl AudioData {
         let fft = planner.plan_fft_forward(self.buffer.len());
 
         let mut buffer: Vec<Complex<f32>> = Vec::new();
-        for i in self.buffer.iter() {
-            buffer.push(Complex { re: *i, im: *i });
+        for freq in self.buffer.iter() {
+            buffer.push(Complex { re: freq.volume, im: 0.0 });
         }
         fft.process(&mut buffer[..]);
 
         for (i, val) in buffer.iter().enumerate() {
-            self.buffer[i] = val.norm();
+            self.buffer[i].volume = val.norm();
         }
         // remove mirroring
         self.buffer = self.buffer[0..(self.buffer.len() as f32 * 0.5 ) as usize].to_vec();
@@ -59,7 +71,7 @@ impl AudioData {
             VolumeNormalisation::Linear(v) => {
                 for i in 0..self.buffer.len() {
                     let percentage: f32 = i as f32 / self.buffer.len() as f32;
-                    self.buffer[i] *= percentage.powf(*v);
+                    self.buffer[i].volume *= percentage.powf(*v);
                 }
             }
         }
@@ -72,14 +84,16 @@ impl AudioData {
             // space normalisation and space distribution
             //let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
             let norm_offset: f32 = self.normalized_offset(i as f32, self.buffer.len());
-            let y = self.buffer[i] * 0.05;
+            let y = self.buffer[i].volume * 0.05;
 
             let freq: f32 = ((i + 1) as f32 / self.buffer.len() as f32) * (self.config.sample_rate as f32) / 2.0;
             pos_index.push((freq, norm_offset, y));
         }
 
         // Interpolation and eq
-        let mut points: Vec<Key<f32, f32>> = Vec::new();
+        let mut vol_points: Vec<Key<f32, f32>> = Vec::new();
+        let mut freq_points: Vec<Key<f32, f32>> = Vec::new();
+
         let mut eq_pointer: f32 = 0.0;
         let mut abs_pointer: f32 = 0.0;
     
@@ -97,26 +111,35 @@ impl AudioData {
                     eq_pointer += eq_offset;
                     abs_pointer = eq_pointer * norm_offset;
 
-                    points.push(Key::new(abs_pointer, y, Interpolation::Linear));
+                    vol_points.push(Key::new(abs_pointer, y, Interpolation::Linear));
+                    freq_points.push(Key::new(abs_pointer, freq, Interpolation::Linear));
                 }
             }
         }
 
-        let spline = Spline::from_vec(points);
+        let vol_spline = Spline::from_vec(vol_points);
+        let freq_spline = Spline::from_vec(freq_points);
 
         self.buffer.drain(..);
 
         for i in 0..(abs_pointer as usize) {
-            match spline.sample(i as f32) {
-                Some(v) => self.buffer.push(v),
+            match vol_spline.sample(i as f32) {
+                Some(volume) => {
+                    match freq_spline.sample(i as f32) {
+                        Some(freq) => {
+                            self.buffer.push(Frequency {volume, freq});
+                        }
+                        None => (),
+                    }
+                },
                 None => (),
             }
         }
 
         fn get_eq_spline(config: &Config) -> Spline<f32, f32> {
             let mut points: Vec<Key<f32, f32>> = Vec::new();
-            for eq in config.eq.iter() {
-                points.push(Key::new(eq.0 as f32, eq.1, Interpolation::Linear));
+            for freq_dis in config.frequency_distribution.iter() {
+                points.push(Key::new(freq_dis.0 as f32, freq_dis.1, Interpolation::Linear));
             }
             Spline::from_vec(points)
         }
@@ -125,72 +148,32 @@ impl AudioData {
         }
     }
 
-    pub fn smooth(&mut self) {
-        if !(self.buffer.len() <= self.config.smoothing_size || self.config.smoothing_size == 0) {
-            for _ in 0..self.config.smoothing_amount {
-                for i in 0..self.buffer.len() {
-                    // smoothing size drop for higher freqs
-                    let percentage: f32 = (self.buffer.len() - i) as f32 / self.buffer.len() as f32;
-                    let smoothing_size: usize =
-                        (self.config.smoothing_size as f32 * percentage) as usize + 1;
-
-                    let mut y: f32 = 0.0;
-                    for x in 0..smoothing_size {
-                        if self.buffer.len() > i + x {
-                            y += self.buffer[i + x];
-                        }
-                    }
-                    self.buffer[i] = y / smoothing_size as f32;
-                }
-            }
-        }
-    }
-
     #[allow(clippy::collapsible_if)]
     pub fn apply_bar_count(&mut self) {
         let current_bars: f32 = self.buffer.len() as f32;
         let resolution: f32 = self.config.bar_count as f32 / current_bars;
 
-        let mut output_buffer: Vec<f32> =
-            vec![0.0; (self.buffer.len() as f32 * resolution) as usize];
+        let mut output_buffer: Vec<Frequency> =
+            vec![Frequency {volume: 0.0, freq: 0.0}; (self.buffer.len() as f32 * resolution) as usize];
 
-        if resolution > 1.0 {
-            let mut points: Vec<Key<f32, f32>> = Vec::new();
-            for (i, val) in self.buffer.iter().enumerate() {
-                points.push(Key::new(i as f32 * resolution, *val, Interpolation::Linear));
-            }
-
-            let spline = Spline::from_vec(points);
-
-            for (i, val) in output_buffer.iter_mut().enumerate() {
-                let v = spline.clamped_sample(i as f32).unwrap_or(0.0);
-                *val = v;
-            }
-
-            self.buffer = output_buffer;
-        } else if resolution < 1.0 {
+        if resolution < 1.0 {
             let offset = output_buffer.len() as f32 / self.buffer.len() as f32;
-            for (i, val) in self.buffer.iter().enumerate() {
+            for (i, freq) in self.buffer.iter().enumerate() {
                 let pos = (i as f32 * offset) as usize;
 
                 // cannot be collapsed as clippy notes i think
                 if pos < output_buffer.len() {
                     // crambling type
-                    if output_buffer[pos] < *val {
-                        output_buffer[pos] = *val;
+                    if output_buffer[pos].volume < freq.volume {
+                        output_buffer[pos] = Frequency {volume: freq.volume, freq: freq.freq};
                     }
-
-                    // smoothing type
-                    //output_buffer[pos] = (output_buffer[pos] + *val) * 0.5;
                 }
             }
 
             self.buffer = output_buffer;
-        } else {
         }
     }
 
-    #[inline]
     fn normalized_offset(&self, linear_pos: f32, buf_len: usize) -> f32 {
         (buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5)
     }

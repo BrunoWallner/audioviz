@@ -5,7 +5,7 @@ use std::thread;
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    RequestData(mpsc::Sender<Vec<f32>>),
+    RequestData(mpsc::Sender<Vec<Frequency>>),
     SendData(Vec<f32>),
     RequestConfig(mpsc::Sender<Config>),
     SendConfig(Config),
@@ -13,7 +13,7 @@ pub enum Event {
 }
 
 enum ConverterEvent {
-    RequestData(mpsc::Sender<Vec<f32>>),
+    RequestData(mpsc::Sender<Vec<Frequency>>),
     SendRawData(Vec<f32>),
     SendConfig(Config),
 }
@@ -67,9 +67,9 @@ impl AudioStream {
         //let event_sender_clone = event_sender.clone();
         thread::spawn(move || {
             //let mut buffer: Vec<f32> = Vec::new();
-            let mut current_buffer: Vec<f32> = Vec::new();
+            let mut current_buffer: Vec<Frequency> = Vec::new();
 
-            let mut gravity_buffer: Vec<f32> = Vec::new();
+            let mut gravity_buffer: Vec<Frequency> = Vec::new();
             let mut gravity_time_buffer: Vec<u32> = Vec::new();
 
             let mut config: Config = config;
@@ -78,36 +78,6 @@ impl AudioStream {
                 match event_receiver.recv().unwrap() {
                     Event::SendData(b) => {
                         converter_sender.send(ConverterEvent::SendRawData(b)).unwrap();
-
-                        /*
-                        buffer.append(&mut b);
-
-                        // fix for very long response times in Event::ReqestRefresh
-                        let config_clone = config.clone();
-                        let event_sender_clone = event_sender_clone.clone();
-                        let mut buffer = buffer.clone();
-                        let fft_res: usize = config.fft_resolution;
-                        thread::spawn(move || {
-                            while buffer.len() > fft_res {
-                                let mut audio_data = AudioData::new(
-                                    config_clone.clone(),
-                                    &buffer[0..fft_res].to_vec(),
-                                );
-                                audio_data.compute_all();
-
-                                // remove already calculated parts
-                                let cutoff: f32 = match config_clone.pre_fft_buffer_cutoff {
-                                    d if (0.001..=1.0).contains(&d) => d,
-                                    _ => 0.5,
-                                };
-                                buffer.drain(0..(fft_res as f32 * cutoff) as usize);
-                                
-                                event_sender_clone
-                                    .send(Event::SendCalculatedBuffer( [audio_data.buffer, buffer.clone()] ))
-                                    .unwrap();
-                            }
-                        });
-                        */
                     }
                     Event::RequestData(sender) => match config.gravity {
                         Some(_) => {
@@ -122,18 +92,6 @@ impl AudioStream {
                         }
                     },
                     Event::RequestRefresh => {
-                        /*
-                        if !calculated_buffer.is_empty() {
-                            current_buffer = calculated_buffer.pop().unwrap();
-
-                        }
-                        */
-                        /*
-                        if !calculated_buffer.is_empty() {
-                            current_buffer = calculated_buffer[0].clone();
-                            calculated_buffer.drain(..);
-                        }
-                        */
                         // request data from converter thread
                         let (tx, rx) = mpsc::channel();
                         converter_sender.send(ConverterEvent::RequestData(tx)).unwrap();
@@ -146,7 +104,7 @@ impl AudioStream {
                         match config.gravity {
                             Some(gravity) => {
                                 if gravity_buffer.len() != current_buffer.len() {
-                                    gravity_buffer = vec![0.0; current_buffer.len()];
+                                    gravity_buffer = vec![Frequency::empty(); current_buffer.len()];
                                 }
                                 if gravity_time_buffer.len() != current_buffer.len() {
                                     gravity_time_buffer = vec![0; current_buffer.len()];
@@ -154,8 +112,8 @@ impl AudioStream {
 
                                 // sets value of gravity_buffer to current_buffer if current_buffer is higher
                                 for i in 0..current_buffer.len() {
-                                    if gravity_buffer[i] < current_buffer[i] {
-                                        gravity_buffer[i] = current_buffer[i];
+                                    if gravity_buffer[i].volume < current_buffer[i].volume {
+                                        gravity_buffer[i] = current_buffer[i].clone();
                                         gravity_time_buffer[i] = 0;
                                     } else {
                                         gravity_time_buffer[i] += 1;
@@ -163,8 +121,8 @@ impl AudioStream {
                                 }
 
                                 // apply gravity to buffer
-                                for (i, v) in gravity_buffer.iter_mut().enumerate() {
-                                    *v -= gravity * 0.0025 * (gravity_time_buffer[i] as f32);
+                                for (i, freq) in gravity_buffer.iter_mut().enumerate() {
+                                    freq.volume -= gravity * 0.0025 * (gravity_time_buffer[i] as f32);
                                 }
                             }
                             None => (),
@@ -195,7 +153,7 @@ impl AudioStream {
 
         AudioStream { event_sender }
     }
-    pub fn get_audio_data(&self) -> Vec<f32> {
+    pub fn get_audio_data(&self) -> Vec<Frequency> {
         let (tx, rx) = mpsc::channel();
         self.event_sender.send(Event::RequestData(tx)).unwrap();
         rx.recv().unwrap()
