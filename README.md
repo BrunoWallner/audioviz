@@ -1,5 +1,5 @@
 # audioviz
-A modular and simple libary to make raw audiodata visually more appealing in realtime.
+A modular and simple library to make raw audiodata visually more appealing in realtime.
 
 It is not intended for scientific usecases.
 

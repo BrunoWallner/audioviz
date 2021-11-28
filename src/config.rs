@@ -2,13 +2,30 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
+    /// neccessary so that the Audiostream knows what the hightest frequency is. (`sample_rate` / 2)
     pub sample_rate: u32,
+
+    /// with higher resolution comes better precision, that is mostly needed for lower frequencies
     pub fft_resolution: usize,
+    
+    /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
     pub refresh_rate: usize,
+
+    /// range of frequencies
     pub frequency_bounds: [usize; 2],
+
+    /// number of total frequencies in processed data
     pub bar_count: usize,
     pub volume: f32,
+
+    /// to compensate for too loud low frequencies
     pub volume_normalisation: VolumeNormalisation,
+
+    /// manually apply scale of frequencies
+    /// 
+    /// frequencies around 50hz have double the scale: `vec![ (50, 2.0) ]`
+    /// 
+    /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
     pub frequency_distribution: Vec<(usize, f32)>,
     pub gravity: Option<f32>,
     pub interpolation: Interpolation,
@@ -46,7 +63,7 @@ pub enum Interpolation {
     /// This will skip distribution, so you would have to do it manually
     None,
 
-    /// ```
+    /// ```text
     ///           | |
     ///           | |
     ///       | | | |
@@ -57,7 +74,7 @@ pub enum Interpolation {
     /// ```
     Step,
 
-    /// ``` 
+    /// ```text
     ///           | 
     ///         | | |  
     ///       | | | | 
@@ -68,7 +85,7 @@ pub enum Interpolation {
     /// ```
     Linear,
 
-    /// ```
+    /// ```text
     ///           |  
     ///           |  
     ///       |   |   | | 
