@@ -76,7 +76,6 @@ fn main() {
 
         // Do something with data...
     }
-
 }
 
 // functions for cpal

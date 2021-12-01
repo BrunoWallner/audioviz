@@ -1,5 +1,5 @@
-use crate::audio_data::*;
-use crate::config::{Config, Interpolation};
+use crate::processor::*;
+use crate::config::{Config, ProcessorConfig};
 use std::sync::mpsc;
 use std::thread;
 
@@ -16,6 +16,64 @@ enum ConverterEvent {
     RequestData(mpsc::Sender<Vec<Frequency>>),
     SendRawData(Vec<f32>),
     SendConfig(Config),
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioStreamController {
+    event_sender: mpsc::Sender<Event>,
+}
+impl AudioStreamController {
+    pub fn send_raw_data(&self, data: &[f32]) {
+        self.event_sender.send(Event::SendData(data.to_vec())).unwrap();
+    }
+
+    pub fn get_frequencies(&self) -> Vec<Frequency> {
+        let (tx, rx) = mpsc::channel();
+        self.event_sender.send(Event::RequestData(tx)).unwrap();
+        rx.recv().unwrap()
+    }
+
+    pub fn adjust_volume(&self, v: f32) {
+        let config = self.get_config();
+        let config = Config {
+            processor: ProcessorConfig {
+                volume: config.processor.volume * v,
+                ..config.processor
+            },
+            ..config
+        };
+        self.set_config(config);
+    }
+
+    // modifying the amount of bars during runtime will result in unexpected behavior
+    // unless sending 'Event::ClearBuffer' before
+    // because the converter assumes that the bar amount stays the same
+    // could be fixed by modifying ./src/processing/combine_buffers
+    pub fn set_config(&self, config: Config) {
+        self.event_sender.send(Event::SendConfig(config)).unwrap();
+    }
+
+    pub fn set_resolution(&self, number: usize) {
+        let config = self.get_config();
+
+        let wanted_conf = Config {
+            processor: ProcessorConfig {
+                resolution: Some(number),
+                ..config.processor
+            },
+            ..config
+        };
+
+        self.event_sender
+            .send(Event::SendConfig(wanted_conf))
+            .unwrap();
+    }
+
+    pub fn get_config(&self) -> Config {
+        let (tx, rx) = mpsc::channel();
+        self.event_sender.send(Event::RequestConfig(tx)).unwrap();
+        rx.recv().unwrap()
+    }
 }
 
 pub struct AudioStream {
@@ -42,14 +100,14 @@ impl AudioStream {
                             let diff = buffer.len() - fft_res;
                             buffer.drain(..diff);
 
-                            let mut audio_data = AudioData::new(
-                                config.clone(),
-                                &buffer[..].to_vec(),
+                            let mut audio_data = Processor::from_raw_data(
+                                config.clone().processor,
+                                buffer[..].to_vec(),
                             );
                             audio_data.compute_all();
                             
                             // must only iterate ONCE
-                            sender.send(audio_data.buffer).ok();
+                            sender.send(audio_data.freq_buffer).ok();
                         }
                     },
                     ConverterEvent::SendRawData(mut data) => {
@@ -89,88 +147,14 @@ impl AudioStream {
                             }
                         };
 
-                        // APPLIES POSITIONS TO FREQUENCIES and interpolation
-                        // VERY IMPORTANT
-                        let buf = match config.interpolation {
-                            Interpolation::None => buf,
-                            Interpolation::Gaps => {
-                                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); buf.len()];
-                                for freq in buf.iter() {
-                                    let abs_pos = (o_buf.len() as f32 * freq.position) as usize;
-                                    if o_buf.len() > abs_pos {
-
-                                        // louder freqs are more important and shall not be overwritten by others
-                                        if freq.volume > o_buf[abs_pos].volume {
-                                            o_buf[abs_pos] = freq.clone();
-                                        }
-                                    }
-                                }
-                                o_buf
-                            },
-                            Interpolation::Step => {
-                                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); buf.len()];
-                                let mut freqs = buf.iter().peekable();
-                                'filling: loop {
-                                    let freq: &Frequency = match freqs.next() {
-                                        Some(f) => f,
-                                        None => break 'filling,
-                                    };
-                                    
-                                    let start: usize = (freq.position * o_buf.len() as f32) as usize;
-                                    let end = 
-                                    (
-                                        match freqs.peek() {
-                                            Some(f) => f.position,
-                                            None => 1.0,
-                                        } * o_buf.len() as f32
-                                    ) as usize;
-                                    
-                                    for i in start..end {
-                                        if o_buf.len() > i {
-                                            o_buf[i] = freq.clone();
-                                        }
-                                    }
-                                }
-
-                                o_buf
-                            }
-                            _ => buf
-                        };
-
-                        // freq bounds
-                        let mut start: usize = 0;
-                        let mut i: usize = 0;
-                        loop {
-                            if i >= buf.len() {
-                                break;
-                            }
-                            if buf[i].freq > config.frequency_bounds[0] as f32 {
-                                start = i;
-                                break;
-                            }
-                            i += 1;
-                        }
-
-                        let mut end: usize = 0;
-                        let mut i: usize = 0;
-                        loop {
-                            if i >= buf.len() {
-                                break;
-                            }
-                            if buf[buf.len() - (i + 1)].freq < config.frequency_bounds[1] as f32 {
-                                end = buf.len() - i;
-                                break;
-                            }
-                            i += 1;
-                        }
-
-                        let buf = buf[start..end].to_vec();
-
-                        // applies resolution
-                        let o_buf = apply_bar_count(&buf, config.bar_count);
+                        let mut processor = Processor::from_frequencies(config.processor.clone(), buf);
+                        processor.interpolate();
+                        processor.bound_frequencies();
+                        processor.apply_resolution();
+                        let buf = processor.freq_buffer;
 
                         // finally sends buffer to request channel
-                        sender.send(o_buf).unwrap();
+                        sender.send(buf).unwrap();
                     },
                     Event::RequestRefresh => {
                         // request data from converter thread
@@ -234,78 +218,10 @@ impl AudioStream {
 
         AudioStream { event_sender }
     }
-    pub fn get_audio_data(&self) -> Vec<Frequency> {
-        let (tx, rx) = mpsc::channel();
-        self.event_sender.send(Event::RequestData(tx)).unwrap();
-        rx.recv().unwrap()
-    }
-    pub fn get_event_sender(&self) -> mpsc::Sender<Event> {
-        self.event_sender.clone()
-    }
-
-    pub fn adjust_volume(&self, v: f32) {
-        let config = self.get_config();
-        let config = Config {
-            volume: config.volume * v,
-            ..config
-        };
-        self.set_config(config);
-    }
-
-    // modifying the amount of bars during runtime will result in unexpected behavior
-    // unless sending 'Event::ClearBuffer' before
-    // because the converter assumes that the bar amount stays the same
-    // could be fixed by modifying ./src/processing/combine_buffers
-    pub fn set_config(&self, config: Config) {
-        self.event_sender.send(Event::SendConfig(config)).unwrap();
-    }
-
-    pub fn set_bar_number(&self, number: usize) {
-        let config = self.get_config();
-
-        let wanted_conf = Config {
-            bar_count: number,
-            ..config
-        };
-
-        self.event_sender
-            .send(Event::SendConfig(wanted_conf))
-            .unwrap();
-    }
-
-    pub fn get_config(&self) -> Config {
-        let (tx, rx) = mpsc::channel();
-        self.event_sender.send(Event::RequestConfig(tx)).unwrap();
-        rx.recv().unwrap()
-    }
-}
-
-
-#[allow(clippy::collapsible_if)]
-fn apply_bar_count(buffer: &Vec<Frequency>, bar_count: usize) -> Vec<Frequency> {
-    let current_bars: f32 = buffer.len() as f32;
-    let resolution: f32 = bar_count as f32 / current_bars;
-
-    let mut output_buffer: Vec<Frequency> =
-        vec![Frequency::empty(); (buffer.len() as f32 * resolution) as usize];
-
-    if resolution < 1.0 {
-        let offset = output_buffer.len() as f32 / buffer.len() as f32;
-        for (i, freq) in buffer.iter().enumerate() {
-            let pos = (i as f32 * offset) as usize;
-
-            // cannot be collapsed as clippy notes i think
-            if pos < output_buffer.len() {
-                // crambling type
-                if output_buffer[pos].volume < freq.volume {
-                    output_buffer[pos] = Frequency {volume: freq.volume, freq: freq.freq, position: freq.position};
-                }
-            }
+    pub fn get_controller(&self) -> AudioStreamController {
+        AudioStreamController {
+            event_sender: self.event_sender.clone()
         }
-
-        output_buffer
-    }
-    else {
-        Vec::new()
     }
 }
+

@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
-    /// neccessary so that the Audiostream knows what the hightest frequency is. (`sample_rate` / 2)
-    pub sample_rate: u32,
+    pub processor: ProcessorConfig,
 
     /// with higher resolution comes better precision, that is mostly needed for lower frequencies
     pub fft_resolution: usize,
@@ -11,38 +10,15 @@ pub struct Config {
     /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
     pub refresh_rate: usize,
 
-    /// range of frequencies
-    pub frequency_bounds: [usize; 2],
-
-    /// number of total frequencies in processed data
-    pub bar_count: usize,
-    pub volume: f32,
-
-    /// to compensate for too loud low frequencies
-    pub volume_normalisation: VolumeNormalisation,
-
-    /// manually apply scale of frequencies
-    /// 
-    /// frequencies around 50hz have double the scale: `vec![ (50, 2.0) ]`
-    /// 
-    /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
-    pub frequency_distribution: Vec<(usize, f32)>,
     pub gravity: Option<f32>,
-    pub interpolation: Interpolation,
 }
 impl Default for Config {
     fn default() -> Self {
         Config {
-            sample_rate: 44_100,
+            processor: ProcessorConfig::default(),
             fft_resolution: 1024 * 4,
             refresh_rate: 60,
-            frequency_bounds: [30, 15000],
-            bar_count: 200,
-            volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Linear(0.65),
-            frequency_distribution: vec![ (30, 3.0), (150, 4.0), (2000, 2.0), (5000, 1.0) ],
             gravity: Some(2.0),
-            interpolation: Interpolation::Linear,
         }
     }
 }
@@ -61,6 +37,16 @@ pub enum Interpolation {
     /// All frequencies are tightly packed together without space distribution
     /// 
     /// This will skip distribution, so you would have to do it manually
+    /// ```text
+    ///     |
+    ///     |
+    ///   | |
+    ///   | | | |
+    ///   | | | |
+    /// | | | | | |
+    /// ++++++++++++
+    /// 
+    /// ```
     None,
 
     /// ```text
@@ -95,4 +81,45 @@ pub enum Interpolation {
     /// ```
     /// The Gaps are empty Frequencies, (`Frequency::empty()`)
     Gaps,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProcessorConfig {
+    /// neccessary so that the Audiostream knows what the hightest frequency is. (`sample_rate` / 2)
+    pub sample_rate: u32,
+
+    /// range of frequencies
+    pub frequency_bounds: [usize; 2],
+
+    /// number of total frequencies in processed data, None to disable downscaling
+    /// 
+    /// max value is length of `input buffer` of raw data / 2
+    pub resolution: Option<usize>,
+
+    pub volume: f32,
+
+    /// to even volume of low and high frequencies
+    pub volume_normalisation: VolumeNormalisation,
+
+    /// manually apply scale of frequencies
+    /// 
+    /// frequencies around 50hz have double the scale: `vec![ (0, 1.0), (50, 2.0), (20000, 1.0) ]`
+    /// 
+    /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
+    pub frequency_distribution: Option<Vec<(usize, f32)>>,
+
+    pub interpolation: Interpolation,
+}
+impl Default for ProcessorConfig {
+    fn default() -> Self {
+        ProcessorConfig {
+            sample_rate: 44_100,
+            frequency_bounds: [30, 15000],
+            resolution: None,
+            volume: 1.0,
+            volume_normalisation: VolumeNormalisation::Linear(0.65),
+            frequency_distribution: Some(vec![ (50, 2.0), (250, 2.0), (2000, 1.0), (5000, 0.75), (15_000, 0.5) ]),
+            interpolation: Interpolation::Step,
+        }
+    }
 }
