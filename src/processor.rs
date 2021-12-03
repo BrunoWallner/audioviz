@@ -112,7 +112,7 @@ impl Processor {
             //let norm_pos: f32 = self.normalized_position(i as f32, self.raw_buffer.len());
 
             let freq: f32 = ((i + 1) as f32 / self.raw_buffer.len() as f32) * (self.config.sample_rate as f32) / 2.0;
-            pos_index.push((freq, self.raw_buffer[i].sqrt()));
+            pos_index.push( (freq, self.raw_buffer[i]) );
         }
 
         //
