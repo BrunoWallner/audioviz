@@ -1,4 +1,4 @@
-//! Audioviz is a simple and easy to use library that makes raw audio-data human readable
+//! Audioviz is a simple and easy to use library that helps you visualises raw audio-data
 //! 
 //! This is done with the help of the Fast Fourier Transform algorithm, 
 //! some frequency-space and volume normalisation and optional effects like gravity.
@@ -15,10 +15,11 @@
 //!              |
 //!              | data stored as `Vec<f32>`
 //!              ↓
-//!    ┌───────────────────┐
-//!    │Audio-Stream thread│
-//!    │that handles events│
-//!    └───────────────────┘
+//!    ┌───────────────────┐        ┌──────────────┐
+//!    │Audiostream a      │ -----> | FftProcessor |
+//!    |Abstraction over   │ <----- |    Scope     |
+//!    │FftProcessor, etc..│        │              │
+//!    └───────────────────┘        └──────────────┘
 //!       ↑            |
 //! Event |            | processed data stored as `Vec<Frequency>`
 //!       |            ↓
@@ -96,11 +97,8 @@
 //!}
 //!``` 
 
-mod processor;
-mod audio_stream;
-mod config;
+pub mod spectralizer;
+//mod audio_stream;
 
-pub use audio_stream::{AudioStream, AudioStreamController};
-pub use audio_stream::Event;
-pub use config::{Config, VolumeNormalisation, Interpolation};
-pub use processor::{Processor, Frequency};
+//pub use audio_stream::{AudioStream, AudioStreamController};
+//pub use audio_stream::Event;

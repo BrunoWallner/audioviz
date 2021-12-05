@@ -1,28 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Config {
-    pub processor: ProcessorConfig,
-
-    /// with higher resolution comes better precision, that is mostly needed for lower frequencies
-    pub fft_resolution: usize,
-    
-    /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
-    pub refresh_rate: usize,
-
-    pub gravity: Option<f32>,
-}
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            processor: ProcessorConfig::default(),
-            fft_resolution: 1024 * 4,
-            refresh_rate: 60,
-            gravity: Some(2.0),
-        }
-    }
-}
-
 // I know it can be replaced with Option<>, but I want to add things in the future
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum VolumeNormalisation {
@@ -120,6 +97,29 @@ impl Default for ProcessorConfig {
             volume_normalisation: VolumeNormalisation::Linear(0.65),
             frequency_distribution: Some(vec![ (50, 2.0), (250, 2.0), (2000, 1.0), (5000, 0.75), (15_000, 0.5) ]),
             interpolation: Interpolation::Step,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StreamConfig {
+    pub processor: ProcessorConfig,
+
+    /// with higher resolution comes better precision, that is mostly needed for lower frequencies
+    pub fft_resolution: usize,
+    
+    /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
+    pub refresh_rate: usize,
+
+    pub gravity: Option<f32>,
+}
+impl Default for StreamConfig {
+    fn default() -> Self {
+        StreamConfig {
+            processor: ProcessorConfig::default(),
+            fft_resolution: 1024 * 4,
+            refresh_rate: 60,
+            gravity: Some(2.0),
         }
     }
 }

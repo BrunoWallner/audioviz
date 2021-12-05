@@ -1,36 +1,12 @@
-use crate::config::{ProcessorConfig, VolumeNormalisation};
-use crate::config::Interpolation as ConfigInterpolation;
-
 use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
-/// Single Frequency
-/// 
-/// Multiple of these are stored in a Vector,
-#[derive(Clone, Debug)]
-pub struct Frequency {
-    pub volume: f32,
+use crate::spectralizer::config::{ProcessorConfig, VolumeNormalisation};
+use crate::spectralizer::config::Interpolation as ConfigInterpolation;
 
-    /// Actual frequency in hz, can range from 0 to `config.sample_rate` / 2
-    /// 
-    /// Accuracy can vary and is not guaranteed
-    pub freq: f32,
+use crate::spectralizer::Frequency;
 
-    /// Relative position of single frequency in range (0..=1)
-    /// 
-    /// Used to make lower freqs occupy more space than higher ones, to mimic human hearing
-    /// 
-    /// Should not be Important, except when distributing freqs manually
-    /// 
-    /// To do this manually set `config.interpolation` equal to `Interpolation::None`
-    pub position: f32,
-}
-impl Frequency {
-    pub fn empty() -> Self {
-        Frequency {volume: 0.0, freq: 0.0, position: 0.0}
-    }
-}
-
+/// Object that deals with processing for spectralized output with the help of Fast Fourier Transform
 #[derive(Clone, Debug)]
 pub struct Processor {
     config: ProcessorConfig,
@@ -55,17 +31,21 @@ impl Processor {
         }
     }
 
+    /// process everything in recommended order
     pub fn compute_all(&mut self) {
         self.apodize();
         self.fft();
         self.distribute_volume();
         self.normalize_and_distribute();
+        self.interpolate();
+        self.bound_frequencies();
+        self.apply_resolution();
     }
 
     pub fn apodize(&mut self) {
         let window = apodize::hanning_iter(self.raw_buffer.len()).collect::<Vec<f64>>();
-        for i in 0..self.raw_buffer.len() {
-            self.raw_buffer[i] *= window[i] as f32;
+        for (i, value) in self.raw_buffer.iter_mut().enumerate() {
+            *value *= window[i] as f32;
         }
     }
 
@@ -307,13 +287,4 @@ impl Processor {
             self.freq_buffer = output_buffer;
         }
     }
-
-    /*
-    fn normalized_position(&self, linear_pos: f32, buf_len: usize) -> f32 {
-        //(buf_len as f32 / (linear_pos + 1.0) as f32).powf(0.5)
-        //(buf_len as f32 / (linear_pos + 1.0) as f32).log(2.0)
-        let offset = (linear_pos + 1.0) / buf_len as f32;
-        buf_len as f32 * offset.sqrt()
-    }
-    */
 }
