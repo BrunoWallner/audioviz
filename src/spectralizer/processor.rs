@@ -36,7 +36,8 @@ impl Processor {
         self.apodize();
         self.fft();
         self.distribute_volume();
-        self.normalize_and_distribute();
+        self.distribute();
+        self.scale_frequencies();
         self.interpolate();
         self.bound_frequencies();
         self.apply_resolution();
@@ -81,7 +82,7 @@ impl Processor {
     }
 
     // normalizes raw_buffer into freq_buffer
-    pub fn normalize_and_distribute(&mut self) {
+    pub fn distribute(&mut self) {
         let mut pos_index: Vec<(f32, f32)> = Vec::new(); // freq, volume
 
         for i in 0..self.raw_buffer.len() {
@@ -130,7 +131,6 @@ impl Processor {
                 // with normalisation
                 for freq in self.freq_buffer.iter_mut() {
                     freq.position /= abs_pointer;
-                    freq.position = freq.position.powf(0.25);
                 }
             }
             None => {
@@ -153,7 +153,6 @@ impl Processor {
                 let freq_buf_len = self.freq_buffer.len() as f32;
                 for freq in self.freq_buffer.iter_mut() {
                     freq.position /= freq_buf_len;
-                    freq.position = freq.position.powf(0.25);
                 }
             }
         }
@@ -167,6 +166,12 @@ impl Processor {
         }
         fn get_dis_offset(spline: &Spline<f32, f32>, freq: f32) -> f32 {
             spline.clamped_sample(freq).unwrap_or(1.0)
+        }
+    }
+
+    pub fn scale_frequencies(&mut self) {
+        for freq in self.freq_buffer.iter_mut() {
+            freq.position = freq.position.powf(0.25);
         }
     }
 
@@ -254,7 +259,19 @@ impl Processor {
         }
 
         // bounds
-        self.freq_buffer = self.freq_buffer[start..end].to_vec();
+        let mut bound_buff = self.freq_buffer[start..end].to_vec();
+
+        // fix for first and last frequency's position not being 0 and 1
+        let start_pos: f32 = bound_buff[0].position;
+        let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;
+        let end_pos_offset: f32 = 1.0 / end_pos;
+        
+        for freq in bound_buff.iter_mut() {
+            freq.position -= start_pos;
+            freq.position *= end_pos_offset;
+        }
+
+        self.freq_buffer = bound_buff;
     }
 
     #[allow(clippy::collapsible_if)]

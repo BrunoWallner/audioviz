@@ -91,11 +91,11 @@ impl Default for ProcessorConfig {
     fn default() -> Self {
         ProcessorConfig {
             sample_rate: 44_100,
-            frequency_bounds: [30, 15000],
+            frequency_bounds: [40, 20000],
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            frequency_distribution: Some(vec![ (50, 2.0), (250, 2.0), (2000, 1.0), (5000, 0.75), (15_000, 0.5) ]),
+            frequency_distribution: Some(vec![ (250, 3.0), (1000, 4.0), (2000, 1.0) ]),
             interpolation: Interpolation::Step,
         }
     }
