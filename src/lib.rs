@@ -6,27 +6,6 @@
 //! It can currently only be used on live visualisation, where it is consistently fed with data,
 //! but mp3 or wav file processing might be added in the future.
 //! 
-//! # How it works
-//! ```text
-//! ┌──────────────────────────┐
-//! │ thread that consistently │
-//! │sends data to audio-stream│
-//! └──────────────────────────┘         
-//!              |
-//!              | data stored as `Vec<f32>`
-//!              ↓
-//!    ┌───────────────────┐        ┌──────────────┐
-//!    │Audiostream a      │ -----> | FftProcessor |
-//!    |Abstraction over   │ <----- |    Scope     |
-//!    │FftProcessor, etc..│        │              │
-//!    └───────────────────┘        └──────────────┘
-//!       ↑            |
-//! Event |            | processed data stored as `Vec<Frequency>`
-//!       |            ↓
-//! ┌─────────────────────────┐
-//! │thread that receives data│
-//! └─────────────────────────┘
-//! ``` 
 //! # Code Example
 //! ```
 //!use audioviz::*;
@@ -97,8 +76,8 @@
 //!}
 //!``` 
 
+/// seperates continuous audio-data to vector of single frequencies
 pub mod spectralizer;
-//mod audio_stream;
 
-//pub use audio_stream::{AudioStream, AudioStreamController};
-//pub use audio_stream::Event;
+/// centers given length of audio-data
+pub mod scope;

@@ -6,7 +6,7 @@ use crate::spectralizer::config::Interpolation as ConfigInterpolation;
 
 use crate::spectralizer::Frequency;
 
-/// Object that deals with processing for spectralized output with the help of Fast Fourier Transform
+/// struct that deals with processing for spectralized output with the help of Fast Fourier Transform
 #[derive(Clone, Debug)]
 pub struct Processor {
     config: ProcessorConfig,

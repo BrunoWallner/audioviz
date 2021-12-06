@@ -11,9 +11,9 @@ pub enum VolumeNormalisation {
 pub enum Interpolation {
     /// Not recommended
     /// 
-    /// All frequencies are tightly packed together without space distribution
+    /// All frequencies are tightly packed together without space distribution applied
     /// 
-    /// This will skip distribution, so you would have to do it manually
+    /// you would have manually apply positions of frequencies
     /// ```text
     ///     |
     ///     |

@@ -1,10 +1,37 @@
-use crate::spectralizer::{Frequency, Processor};
+//! abstraction over the processor, where one thread must constantly send the audiodata
+//! 
+//! and another thread can request the processed data
+//! 
+//! # How it works
+//! ```text
+//!     ┌──────────────────────────┐
+//!     │ thread that consistently │
+//!     │   sends data to Stream   │
+//!     └──────────────────────────┘         
+//!           |
+//!           | data stored as `Vec<f32>`
+//!           ↓
+//! ┌──────────────────┐      ┌───────────────────┐        ┌──────────────┐
+//! | StreamController | ---> │      Stream       │ -----> |  Processor   |
+//! |                  | <--- |                   │ <----- |              |
+//! └──────────────────┘      └───────────────────┘        └──────────────┘ 
+//!        ↑ └----------┐
+//!        └----------┐ |
+//! get_frequencies() | | processed data stored as `Vec<Frequency>`
+//!                   | ↓
+//!     ┌─────────────────────────┐
+//!     │thread that receives data│
+//!     └─────────────────────────┘
+//! ``` 
+
+
+use crate::spectralizer::{Frequency, processor::Processor};
 use crate::spectralizer::config::{StreamConfig, ProcessorConfig};
 use std::sync::mpsc;
-use std::thread;
+use std::thread; 
 
 #[derive(Debug, Clone)]
-pub enum Event {
+enum Event {
     RequestData(mpsc::Sender<Vec<Frequency>>),
     SendData(Vec<f32>),
     RequestConfig(mpsc::Sender<StreamConfig>),
@@ -12,6 +39,7 @@ pub enum Event {
     RequestRefresh,
 }
 
+/// Controller for Stream, that can be cloned to other threads, to send the raw audiodata, request processed data, etc...
 #[derive(Clone, Debug)]
 pub struct StreamController {
     event_sender: mpsc::Sender<Event>,
@@ -74,6 +102,7 @@ impl StreamController {
     }
 }
 
+/// abstraction over `processor::Processor` with additional effects like gravity
 pub struct Stream {
     event_sender: mpsc::Sender<Event>,
 }

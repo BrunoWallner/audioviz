@@ -1,9 +1,11 @@
+/// processes the audiodata
 pub mod processor;
-pub mod config;
-pub mod stream;
 
-pub use processor::Processor;
-pub use stream::{Stream, StreamController};
+/// configs for `processor::Processor` and `stream::Stream`
+pub mod config;
+
+/// abstraction over processor with additional effects like gravity
+pub mod stream;
 
 /// Single Frequency
 /// 
