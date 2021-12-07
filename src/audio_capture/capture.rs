@@ -98,6 +98,7 @@ enum DistributorEvent {
     BufferPushRequest,
 }
 
+// converts choppy buffers received from cpal to more continous buffers
 fn init_distributor(
     receiver: mpsc::Receiver<DistributorEvent>,
     distributor_event_sender: mpsc::Sender<DistributorEvent>,
@@ -109,6 +110,9 @@ fn init_distributor(
         None => 44_100,
     };
     let micros_to_wait: u64 = 1_000_000 / sample_rate as u64 * config.buffer_size as u64;
+    
+    // reduces risk of buffer growing indefinetly but still might result in some form of memory leak
+    let micros_to_wait = (micros_to_wait as f32 * 0.95) as u64;
 
     let mut buffer: Vec<f32> = Vec::new();
     thread::spawn(move || loop {
@@ -118,9 +122,10 @@ fn init_distributor(
                     buffer.append(&mut data);
                 }
                 DistributorEvent::BufferPushRequest => {
-                    sender.send(buffer.clone()).ok();
-                    // clears already pushed parts
-                    if buffer.len() > config.buffer_size as usize * 1 {
+                    if buffer.len() > config.buffer_size as usize {
+                        sender.send(buffer[0..config.buffer_size as usize].to_vec()).ok();
+                        
+                        // clears already pushed parts
                         buffer.drain(0..config.buffer_size as usize);
                     }
                 }
