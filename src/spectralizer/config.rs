@@ -10,9 +10,9 @@ pub enum VolumeNormalisation {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Interpolation {
     /// Not recommended
-    /// 
+    ///
     /// All frequencies are tightly packed together without space distribution applied
-    /// 
+    ///
     /// you would have manually apply positions of frequencies
     /// ```text
     ///     |
@@ -22,7 +22,7 @@ pub enum Interpolation {
     ///   | | | |
     /// | | | | | |
     /// ++++++++++++
-    /// 
+    ///
     /// ```
     None,
 
@@ -38,11 +38,11 @@ pub enum Interpolation {
     Step,
 
     /// ```text
-    ///           | 
+    ///           |
     ///         | | |  
-    ///       | | | | 
-    ///     | | | | | | | 
-    ///   | | | | | | | | 
+    ///       | | | |
+    ///     | | | | | | |
+    ///   | | | | | | | |
     /// | | | | | | | | | |
     /// +++++++++++++++++++
     /// ```
@@ -51,8 +51,8 @@ pub enum Interpolation {
     /// ```text
     ///           |  
     ///           |  
-    ///       |   |   | | 
-    ///       |   |   | | 
+    ///       |   |   | |
+    ///       |   |   | |
     /// |     |   |   | | |
     /// +++++++++++++++++++
     /// ```
@@ -69,7 +69,7 @@ pub struct ProcessorConfig {
     pub frequency_bounds: [usize; 2],
 
     /// number of total frequencies in processed data, None to disable downscaling
-    /// 
+    ///
     /// max value is length of `input buffer` of raw data / 2
     pub resolution: Option<usize>,
 
@@ -79,9 +79,9 @@ pub struct ProcessorConfig {
     pub volume_normalisation: VolumeNormalisation,
 
     /// manually apply scale of frequencies
-    /// 
+    ///
     /// frequencies around 50hz have double the scale: `vec![ (0, 1.0), (50, 2.0), (20000, 1.0) ]`
-    /// 
+    ///
     /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
     pub frequency_distribution: Option<Vec<(usize, f32)>>,
 
@@ -95,7 +95,7 @@ impl Default for ProcessorConfig {
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            frequency_distribution: Some(vec![ (250, 3.0), (1000, 4.0), (2000, 1.0) ]),
+            frequency_distribution: Some(vec![(250, 3.0), (1000, 4.0), (2000, 1.0)]),
             interpolation: Interpolation::Step,
         }
     }
@@ -107,7 +107,7 @@ pub struct StreamConfig {
 
     /// with higher resolution comes better precision, that is mostly needed for lower frequencies
     pub fft_resolution: usize,
-    
+
     /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
     pub refresh_rate: usize,
 

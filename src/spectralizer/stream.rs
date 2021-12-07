@@ -1,7 +1,7 @@
 //! abstraction over the processor, where one thread must constantly send the audiodata
-//! 
+//!
 //! and another thread can request the processed data
-//! 
+//!
 //! # How it works
 //! ```text
 //!     ┌──────────────────────────┐
@@ -14,7 +14,7 @@
 //! ┌──────────────────┐      ┌───────────────────┐        ┌──────────────┐
 //! | StreamController | ---> │      Stream       │ -----> |  Processor   |
 //! |                  | <--- |                   │ <----- |              |
-//! └──────────────────┘      └───────────────────┘        └──────────────┘ 
+//! └──────────────────┘      └───────────────────┘        └──────────────┘
 //!        ↑ └----------┐
 //!        └----------┐ |
 //! get_frequencies() | | processed data stored as `Vec<Frequency>`
@@ -22,13 +22,14 @@
 //!     ┌─────────────────────────┐
 //!     │thread that receives data│
 //!     └─────────────────────────┘
-//! ``` 
+//! ```
 
-
-use crate::spectralizer::{Frequency, processor::Processor};
-use crate::spectralizer::config::{StreamConfig, ProcessorConfig};
+use crate::spectralizer::config::{ProcessorConfig, StreamConfig};
+use crate::spectralizer::{processor::Processor, Frequency};
 use std::sync::mpsc;
-use std::thread; 
+use std::thread;
+
+use crate::audio_capture::capture::Capture;
 
 #[derive(Debug, Clone)]
 enum Event {
@@ -46,7 +47,9 @@ pub struct StreamController {
 }
 impl StreamController {
     pub fn send_raw_data(&self, data: &[f32]) {
-        self.event_sender.send(Event::SendData(data.to_vec())).unwrap();
+        self.event_sender
+            .send(Event::SendData(data.to_vec()))
+            .unwrap();
     }
 
     pub fn get_frequencies(&self) -> Vec<Frequency> {
@@ -107,6 +110,22 @@ pub struct Stream {
     event_sender: mpsc::Sender<Event>,
 }
 impl Stream {
+    pub fn init_from_capture(capture: Capture, config: StreamConfig) -> Self {
+        let stream = Stream::init(config);
+        let event_sender = stream.event_sender;
+        let e_v = event_sender.clone();
+        thread::spawn(move || loop {
+            match capture.receiver.recv() {
+                Ok(data) => {
+                    e_v.send(Event::SendData(data)).ok();
+                }
+                Err(_) => (),
+            }
+        });
+        Self {
+            event_sender: event_sender,
+        }
+    }
     pub fn init(config: StreamConfig) -> Self {
         let (event_sender, event_receiver) = mpsc::channel();
 
@@ -139,12 +158,11 @@ impl Stream {
                             let fft_res: usize = config.fft_resolution;
 
                             if raw_buffer.len() > fft_res {
-    
                                 // clears unimportant buffer values that should already be processed
                                 // and thus reduce latency
                                 let diff = raw_buffer.len() - fft_res;
                                 raw_buffer.drain(..diff);
-    
+
                                 let mut audio_data = Processor::from_raw_data(
                                     config.clone().processor,
                                     raw_buffer[..].to_vec(),
@@ -156,7 +174,8 @@ impl Stream {
                                     Some(gravity) => {
                                         /* applies gravity to buffer */
                                         if freq_buffer.len() != processed_buffer.len() {
-                                            freq_buffer = vec![Frequency::empty(); processed_buffer.len()];
+                                            freq_buffer =
+                                                vec![Frequency::empty(); processed_buffer.len()];
                                         }
                                         if gravity_time_buffer.len() != processed_buffer.len() {
                                             gravity_time_buffer = vec![0; processed_buffer.len()];
@@ -173,7 +192,8 @@ impl Stream {
 
                                         // apply gravity to buffer
                                         for (i, freq) in freq_buffer.iter_mut().enumerate() {
-                                            freq.volume -= gravity * 0.0025 * (gravity_time_buffer[i] as f32);
+                                            freq.volume -=
+                                                gravity * 0.0025 * (gravity_time_buffer[i] as f32);
                                         }
                                     }
                                     None => {
@@ -182,8 +202,7 @@ impl Stream {
                                     }
                                 }
                             }
-                        }
-                        // end of submatch
+                        } // end of submatch
                     }
                 }
             }
@@ -208,7 +227,7 @@ impl Stream {
 
     pub fn get_controller(&self) -> StreamController {
         StreamController {
-            event_sender: self.event_sender.clone()
+            event_sender: self.event_sender.clone(),
         }
     }
 }

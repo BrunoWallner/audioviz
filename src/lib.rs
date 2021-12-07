@@ -1,11 +1,11 @@
 //! Audioviz is a simple and easy to use library that helps you visualises raw audio-data
-//! 
-//! This is done with the help of the Fast Fourier Transform algorithm, 
+//!
+//! This is done with the help of the Fast Fourier Transform algorithm,
 //! some frequency-space and volume normalisation and optional effects like gravity.
-//! 
+//!
 //! It can currently only be used on live visualisation, where it is consistently fed with data,
 //! but mp3 or wav file processing might be added in the future.
-//! 
+//!
 //! # Code Example
 //! ```
 //!use audioviz::*;
@@ -74,10 +74,13 @@
 //!fn err_fn(err: cpal::StreamError) {
 //!    eprintln!("an error occurred on stream: {}", err);
 //!}
-//!``` 
+//!```
 
 /// seperates continuous audio-data to vector of single frequencies
 pub mod spectralizer;
 
 /// centers given length of audio-data
 pub mod scope;
+
+/// captures audio from system using cpal
+pub mod audio_capture;

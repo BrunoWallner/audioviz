@@ -1,8 +1,8 @@
 use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
-use crate::spectralizer::config::{ProcessorConfig, VolumeNormalisation};
 use crate::spectralizer::config::Interpolation as ConfigInterpolation;
+use crate::spectralizer::config::{ProcessorConfig, VolumeNormalisation};
 
 use crate::spectralizer::Frequency;
 
@@ -65,7 +65,8 @@ impl Processor {
             self.raw_buffer[i] = val.norm();
         }
         // remove mirroring
-        self.raw_buffer = self.raw_buffer[0..(self.raw_buffer.len() as f32 * 0.5 ) as usize].to_vec();
+        self.raw_buffer =
+            self.raw_buffer[0..(self.raw_buffer.len() as f32 * 0.5) as usize].to_vec();
     }
 
     // distributes volume on raw_buffer
@@ -88,12 +89,14 @@ impl Processor {
         for i in 0..self.raw_buffer.len() {
             // space normalisation and space distribution
             //let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
-            
+
             //let norm_offset: f32 = self.normalized_offset(i as f32, self.raw_buffer.len());
             //let norm_pos: f32 = self.normalized_position(i as f32, self.raw_buffer.len());
 
-            let freq: f32 = ((i + 1) as f32 / self.raw_buffer.len() as f32) * (self.config.sample_rate as f32) / 2.0;
-            pos_index.push( (freq, self.raw_buffer[i]) );
+            let freq: f32 = ((i + 1) as f32 / self.raw_buffer.len() as f32)
+                * (self.config.sample_rate as f32)
+                / 2.0;
+            pos_index.push((freq, self.raw_buffer[i]));
         }
 
         //
@@ -105,28 +108,28 @@ impl Processor {
             Some(distribution) => {
                 let mut dis_pointer: f32 = 0.0;
                 let mut abs_pointer: f32 = 0.0;
-            
+
                 let dis_spline = get_dis_spline(distribution.clone());
-        
-                for val in pos_index.iter(){
+
+                for val in pos_index.iter() {
                     let freq = val.0;
                     //let norm_pos = val.1;
-        
+
                     let eq_offset = get_dis_offset(&dis_spline, freq);
                     dis_pointer += eq_offset;
                     abs_pointer = dis_pointer;
-        
+
                     let position = abs_pointer;
                     let freq = freq;
                     let volume = val.1 * self.config.volume;
-        
+
                     self.freq_buffer.push(Frequency {
                         position,
                         freq,
                         volume,
                     });
                 }
-        
+
                 // relative position in range (0..1)
                 // with normalisation
                 for freq in self.freq_buffer.iter_mut() {
@@ -137,7 +140,7 @@ impl Processor {
                 for (i, val) in pos_index.iter().enumerate() {
                     let freq = val.0;
                     //let norm_pos = val.1;
-                    
+
                     let volume = val.1 * self.config.volume;
                     //let position = i as f32 * norm_offset;
 
@@ -160,7 +163,11 @@ impl Processor {
         fn get_dis_spline(distribution: Vec<(usize, f32)>) -> Spline<f32, f32> {
             let mut points: Vec<Key<f32, f32>> = Vec::new();
             for freq_dis in distribution.iter() {
-                points.push(Key::new(freq_dis.0 as f32, freq_dis.1, Interpolation::Linear));
+                points.push(Key::new(
+                    freq_dis.0 as f32,
+                    freq_dis.1,
+                    Interpolation::Linear,
+                ));
             }
             Spline::from_vec(points)
         }
@@ -185,7 +192,6 @@ impl Processor {
                 for freq in self.freq_buffer.iter() {
                     let abs_pos = (o_buf.len() as f32 * freq.position) as usize;
                     if o_buf.len() > abs_pos {
-
                         // louder freqs are more important and shall not be overwritten by others
                         if freq.volume > o_buf[abs_pos].volume {
                             o_buf[abs_pos] = freq.clone();
@@ -193,7 +199,7 @@ impl Processor {
                     }
                 }
                 o_buf
-            },
+            }
             /*
             it seems like overlapping is ocurring in low freqs
             */
@@ -205,16 +211,13 @@ impl Processor {
                         Some(f) => f,
                         None => break 'filling,
                     };
-                    
+
                     let start: usize = (freq.position * o_buf.len() as f32) as usize;
-                    let end = 
-                    (
-                        match freqs.peek() {
-                            Some(f) => f.position,
-                            None => 1.0,
-                        } * o_buf.len() as f32
-                    ) as usize;
-                    
+                    let end = (match freqs.peek() {
+                        Some(f) => f.position,
+                        None => 1.0,
+                    } * o_buf.len() as f32) as usize;
+
                     for i in start..=end {
                         if o_buf.len() > i {
                             o_buf[i] = freq.clone();
@@ -224,7 +227,7 @@ impl Processor {
 
                 o_buf
             }
-            _ => self.freq_buffer.clone()
+            _ => self.freq_buffer.clone(),
         };
     }
 
@@ -251,7 +254,9 @@ impl Processor {
             if i >= self.freq_buffer.len() {
                 break;
             }
-            if self.freq_buffer[self.freq_buffer.len() - (i + 1)].freq < self.config.frequency_bounds[1] as f32 {
+            if self.freq_buffer[self.freq_buffer.len() - (i + 1)].freq
+                < self.config.frequency_bounds[1] as f32
+            {
                 end = self.freq_buffer.len() - i;
                 break;
             }
@@ -265,7 +270,7 @@ impl Processor {
         let start_pos: f32 = bound_buff[0].position;
         let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;
         let end_pos_offset: f32 = 1.0 / end_pos;
-        
+
         for freq in bound_buff.iter_mut() {
             freq.position -= start_pos;
             freq.position *= end_pos_offset;
@@ -278,9 +283,7 @@ impl Processor {
     pub fn apply_resolution(&mut self) {
         let current_bars: f32 = self.freq_buffer.len() as f32;
         let resolution: f32 = match self.config.resolution {
-            Some(res) => {
-                res as f32 / current_bars
-            }
+            Some(res) => res as f32 / current_bars,
             None => 1.0,
         };
 
@@ -296,7 +299,11 @@ impl Processor {
                 if pos < output_buffer.len() {
                     // crambling type
                     if output_buffer[pos].volume < freq.volume {
-                        output_buffer[pos] = Frequency {volume: freq.volume, freq: freq.freq, position: freq.position};
+                        output_buffer[pos] = Frequency {
+                            volume: freq.volume,
+                            freq: freq.freq,
+                            position: freq.position,
+                        };
                     }
                 }
             }
