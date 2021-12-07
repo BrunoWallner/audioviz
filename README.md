@@ -1,7 +1,8 @@
 # audioviz
-A modular and simple library to make raw audiodata visually more appealing in realtime.
+Audioviz is a simple and easy to use library that helps you visualise raw audio-data
 
-It is not intended for scientific usecases.
+## Demo
+![demo](./media/demo.gif)
 
 ## implementations
 * [crav](https://github.com/BrunoWallner/crav)

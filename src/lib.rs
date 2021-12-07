@@ -1,4 +1,4 @@
-//! Audioviz is a simple and easy to use library that helps you visualises raw audio-data
+//! Audioviz is a simple and easy to use library that helps you visualise raw audio-data
 //!
 //! This is done with the help of the Fast Fourier Transform algorithm,
 //! some frequency-space and volume normalisation and optional effects like gravity.
