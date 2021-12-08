@@ -110,7 +110,7 @@ pub struct Stream {
     event_sender: mpsc::Sender<Event>,
 }
 impl Stream {
-    pub fn init_from_capture(capture: Capture, config: StreamConfig) -> Self {
+    pub fn init_with_capture(capture: Capture, config: StreamConfig) -> Self {
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
         let e_v = event_sender.clone();
@@ -142,7 +142,15 @@ impl Stream {
                 if let Ok(event) = event_receiver.recv() {
                     match event {
                         Event::RequestData(sender) => {
-                            sender.send(freq_buffer.clone()).ok();
+                            let mut audio_data = Processor::from_frequencies(
+                                config.clone().processor,
+                                freq_buffer.clone()
+                            );
+                            audio_data.interpolate();
+                            audio_data.bound_frequencies();
+                            audio_data.apply_resolution();
+
+                            sender.send(audio_data.freq_buffer).ok();
                         }
                         Event::SendData(mut data) => {
                             raw_buffer.append(&mut data);
@@ -167,7 +175,12 @@ impl Stream {
                                     config.clone().processor,
                                     raw_buffer[..].to_vec(),
                                 );
-                                audio_data.compute_all();
+                                audio_data.apodize();
+                                audio_data.fft();
+                                audio_data.distribute_volume();
+                                audio_data.distribute();
+                                audio_data.scale_frequencies();
+
                                 let processed_buffer = audio_data.freq_buffer;
 
                                 match config.gravity {

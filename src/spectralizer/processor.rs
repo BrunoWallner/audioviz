@@ -82,7 +82,10 @@ impl Processor {
         }
     }
 
-    // normalizes raw_buffer into freq_buffer
+    /// distributes raw_buffer into freq_buffer
+    /// 
+    /// very important even if no frequency_distribution is configured as it transforms 
+    /// `self.raw_buffer` into `self.freq_buffer`  
     pub fn distribute(&mut self) {
         let mut pos_index: Vec<(f32, f32)> = Vec::new(); // freq, volume
 
@@ -100,9 +103,7 @@ impl Processor {
         }
 
         //
-        // applies offset and distribution to frequency position in self.buffer
-        // that gets later applied on data request in audio_stream.rs
-        // also applies normalisation
+        // applies distribution to frequency position in self.freq_buffer
         //
         match &self.config.frequency_distribution {
             Some(distribution) => {
@@ -227,7 +228,51 @@ impl Processor {
 
                 o_buf
             }
-            _ => self.freq_buffer.clone(),
+            ConfigInterpolation::Linear => {
+                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); self.freq_buffer.len()];
+                let mut freqs = self.freq_buffer.iter().peekable();
+                'interpolating: loop {
+                    let start_freq: &Frequency = match freqs.next() {
+                        Some(f) => f,
+                        None => break 'interpolating,
+                    };
+
+                    let start: usize = (start_freq.position * o_buf.len() as f32) as usize;
+                    let end_freq = match freqs.peek() {
+                        Some(f) => f,
+                        None => break 'interpolating,
+                    };
+                    let end: usize = (end_freq.position * o_buf.len() as f32) as usize;
+
+                    if start < self.freq_buffer.len() && end < self.freq_buffer.len() {
+                        for i in start..=end {
+                            // should be fine
+                            let pos: usize = i - start;
+                            let gap_size = end - start;
+                            if gap_size > 0 {
+                                let percentage: f32 = pos as f32 / gap_size as f32;
+        
+                                let volume: f32 =
+                                    (start_freq.volume * (1.0 - percentage))
+                                    +
+                                    (end_freq.volume * percentage);
+                                let position: f32 =
+                                    (start_freq.position * (1.0 - percentage))
+                                    +
+                                    (end_freq.position * percentage);
+                                let freq: f32 =
+                                    (start_freq.freq * (1.0 - percentage))
+                                    +
+                                    (end_freq.freq * percentage);
+        
+                                o_buf[i] = Frequency {volume, position, freq};
+                            }
+                        }
+                    }
+                }
+
+                o_buf
+            },
         };
     }
 
@@ -265,7 +310,7 @@ impl Processor {
 
         // bounds
         let mut bound_buff = self.freq_buffer[start..end].to_vec();
-
+        if bound_buff.len() > 0 {
         // fix for first and last frequency's position not being 0 and 1
         let start_pos: f32 = bound_buff[0].position;
         let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;
@@ -277,6 +322,7 @@ impl Processor {
         }
 
         self.freq_buffer = bound_buff;
+        }
     }
 
     #[allow(clippy::collapsible_if)]
