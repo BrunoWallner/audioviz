@@ -35,12 +35,13 @@ impl Processor {
     pub fn compute_all(&mut self) {
         self.apodize();
         self.fft();
-        self.distribute_volume();
-        self.distribute();
-        self.scale_frequencies();
-        self.interpolate();
+        self.normalize_frequency_volume();
+
+        self.raw_to_freq_buffer();
+        self.normalize_frequency_position();
+        self.distribute_frequency_position();
         self.bound_frequencies();
-        self.apply_resolution();
+        self.interpolate();
     }
 
     pub fn apodize(&mut self) {
@@ -69,8 +70,8 @@ impl Processor {
             self.raw_buffer[0..(self.raw_buffer.len() as f32 * 0.5) as usize].to_vec();
     }
 
-    // distributes volume on raw_buffer
-    pub fn distribute_volume(&mut self) {
+    // distribute_frequency_positions volume on raw_buffer
+    pub fn normalize_frequency_volume(&mut self) {
         match &self.config.volume_normalisation {
             VolumeNormalisation::None => (),
             VolumeNormalisation::Linear(v) => {
@@ -82,86 +83,37 @@ impl Processor {
         }
     }
 
-    /// distributes raw_buffer into freq_buffer
+    /// distribute_frequency_positions raw_buffer into freq_buffer
     /// 
     /// very important even if no frequency_distribution is configured as it transforms 
     /// `self.raw_buffer` into `self.freq_buffer`  
-    pub fn distribute(&mut self) {
-        let mut pos_index: Vec<(f32, f32)> = Vec::new(); // freq, volume
+    pub fn distribute_frequency_position(&mut self) {
+        if let Some(distribution) = &self.config.frequency_distribution {
+            let dis_spline = get_dis_spline(&distribution);
 
-        for i in 0..self.raw_buffer.len() {
-            // space normalisation and space distribution
-            //let pos = self.normalized_pos(i as f32, self.buffer.len()) as usize;
+            let freq_buf_len: usize = self.freq_buffer.len();
+            let mut last_position: f32 = 0.0;
+            let mut pointer_pos: f32 = 0.0;
+            for (i, val) in self.freq_buffer.iter_mut().enumerate() {
+                let percentage: f32 = (i + 1) as f32 / freq_buf_len as f32;
+                let freq: f32 = percentage * (self.config.sample_rate as f32 / 2.0);
+                let offset = dis_spline.clamped_sample(freq).unwrap_or(1.0);
 
-            //let norm_offset: f32 = self.normalized_offset(i as f32, self.raw_buffer.len());
-            //let norm_pos: f32 = self.normalized_position(i as f32, self.raw_buffer.len());
+                let diff = val.position - last_position;
 
-            let freq: f32 = ((i + 1) as f32 / self.raw_buffer.len() as f32)
-                * (self.config.sample_rate as f32)
-                / 2.0;
-            pos_index.push((freq, self.raw_buffer[i]));
-        }
-
-        //
-        // applies distribution to frequency position in self.freq_buffer
-        //
-        match &self.config.frequency_distribution {
-            Some(distribution) => {
-                let mut dis_pointer: f32 = 0.0;
-                let mut abs_pointer: f32 = 0.0;
-
-                let dis_spline = get_dis_spline(distribution.clone());
-
-                for val in pos_index.iter() {
-                    let freq = val.0;
-                    //let norm_pos = val.1;
-
-                    let eq_offset = get_dis_offset(&dis_spline, freq);
-                    dis_pointer += eq_offset;
-                    abs_pointer = dis_pointer;
-
-                    let position = abs_pointer;
-                    let freq = freq;
-                    let volume = val.1 * self.config.volume;
-
-                    self.freq_buffer.push(Frequency {
-                        position,
-                        freq,
-                        volume,
-                    });
-                }
-
-                // relative position in range (0..1)
-                // with normalisation
-                for freq in self.freq_buffer.iter_mut() {
-                    freq.position /= abs_pointer;
-                }
+                pointer_pos += diff * offset;
+                last_position = val.position;
+                val.position = pointer_pos;
             }
-            None => {
-                for (i, val) in pos_index.iter().enumerate() {
-                    let freq = val.0;
-                    //let norm_pos = val.1;
 
-                    let volume = val.1 * self.config.volume;
-                    //let position = i as f32 * norm_offset;
-
-                    self.freq_buffer.push(Frequency {
-                        position: i as f32,
-                        freq,
-                        volume,
-                    });
-                }
-
-                // relative position in range (0..1)
-                // with normalisation
-                let freq_buf_len = self.freq_buffer.len() as f32;
-                for freq in self.freq_buffer.iter_mut() {
-                    freq.position /= freq_buf_len;
-                }
+            // makes sure that position of every frequency is <= 1.0
+            let max_pos = self.freq_buffer[self.freq_buffer.len() - 1].position;
+            for freq in self.freq_buffer.iter_mut() {
+                freq.position /= max_pos;
             }
         }
 
-        fn get_dis_spline(distribution: Vec<(usize, f32)>) -> Spline<f32, f32> {
+        fn get_dis_spline(distribution: &Vec<(usize, f32)>) -> Spline<f32, f32> {
             let mut points: Vec<Key<f32, f32>> = Vec::new();
             for freq_dis in distribution.iter() {
                 points.push(Key::new(
@@ -172,24 +124,37 @@ impl Processor {
             }
             Spline::from_vec(points)
         }
-        fn get_dis_offset(spline: &Spline<f32, f32>, freq: f32) -> f32 {
-            spline.clamped_sample(freq).unwrap_or(1.0)
-        }
     }
 
-    pub fn scale_frequencies(&mut self) {
+    /// populates the freq_buffer and applies volume
+    pub fn raw_to_freq_buffer(&mut self) {
+          for (i, val) in self.raw_buffer.iter().enumerate() {
+              let percentage: f32 = (i + 1) as f32 / self.raw_buffer.len() as f32;
+              self.freq_buffer.push( Frequency {
+                volume: *val * self.config.volume,
+                position: percentage,
+                freq: percentage * (self.config.sample_rate as f32 / 2.0)
+              });
+          }  
+    }
+
+    pub fn normalize_frequency_position(&mut self) {
         for freq in self.freq_buffer.iter_mut() {
-            freq.position = freq.position.powf(0.25);
+            freq.position = freq.position.powf(0.5);
         }
     }
 
     pub fn interpolate(&mut self) {
         // APPLIES POSITIONS TO FREQUENCIES and interpolation
         // VERY IMPORTANT
+        let resolution = match self.config.resolution {
+            Some(res) => res,
+            None => self.freq_buffer.len()
+        };
         self.freq_buffer = match self.config.interpolation {
             ConfigInterpolation::None => self.freq_buffer.clone(),
             ConfigInterpolation::Gaps => {
-                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); self.freq_buffer.len()];
+                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 for freq in self.freq_buffer.iter() {
                     let abs_pos = (o_buf.len() as f32 * freq.position) as usize;
                     if o_buf.len() > abs_pos {
@@ -205,8 +170,9 @@ impl Processor {
             it seems like overlapping is ocurring in low freqs
             */
             ConfigInterpolation::Step => {
-                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); self.freq_buffer.len()];
+                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 let mut freqs = self.freq_buffer.iter().peekable();
+
                 'filling: loop {
                     let freq: &Frequency = match freqs.next() {
                         Some(f) => f,
@@ -220,7 +186,7 @@ impl Processor {
                     } * o_buf.len() as f32) as usize;
 
                     for i in start..=end {
-                        if o_buf.len() > i {
+                        if o_buf.len() > i && o_buf[i].volume < freq.volume {
                             o_buf[i] = freq.clone();
                         }
                     }
@@ -229,7 +195,7 @@ impl Processor {
                 o_buf
             }
             ConfigInterpolation::Linear => {
-                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); self.freq_buffer.len()];
+                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 let mut freqs = self.freq_buffer.iter().peekable();
                 'interpolating: loop {
                     let start_freq: &Frequency = match freqs.next() {
@@ -244,7 +210,7 @@ impl Processor {
                     };
                     let end: usize = (end_freq.position * o_buf.len() as f32) as usize;
 
-                    if start < self.freq_buffer.len() && end < self.freq_buffer.len() {
+                    if start < resolution && end < resolution {
                         for i in start..=end {
                             // should be fine
                             let pos: usize = i - start;
@@ -266,11 +232,14 @@ impl Processor {
                                     (end_freq.freq * percentage);
         
                                 o_buf[i] = Frequency {volume, position, freq};
+
+                                if o_buf.len() > i && self.freq_buffer[i].volume < volume {
+                                    o_buf[i] = Frequency {volume, position, freq};
+                                }
                             }
                         }
                     }
                 }
-
                 o_buf
             },
         };
@@ -311,50 +280,17 @@ impl Processor {
         // bounds
         let mut bound_buff = self.freq_buffer[start..end].to_vec();
         if bound_buff.len() > 0 {
-        // fix for first and last frequency's position not being 0 and 1
-        let start_pos: f32 = bound_buff[0].position;
-        let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;
-        let end_pos_offset: f32 = 1.0 / end_pos;
+            // fix for first and last frequency's position not being 0 and 1
+            let start_pos: f32 = bound_buff[0].position;
+            let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;
+            let end_pos_offset: f32 = 1.0 / end_pos;
 
-        for freq in bound_buff.iter_mut() {
-            freq.position -= start_pos;
-            freq.position *= end_pos_offset;
-        }
-
-        self.freq_buffer = bound_buff;
-        }
-    }
-
-    #[allow(clippy::collapsible_if)]
-    pub fn apply_resolution(&mut self) {
-        let current_bars: f32 = self.freq_buffer.len() as f32;
-        let resolution: f32 = match self.config.resolution {
-            Some(res) => res as f32 / current_bars,
-            None => 1.0,
-        };
-
-        if resolution < 1.0 {
-            let mut output_buffer: Vec<Frequency> =
-                vec![Frequency::empty(); (self.freq_buffer.len() as f32 * resolution) as usize];
-
-            let offset = output_buffer.len() as f32 / self.freq_buffer.len() as f32;
-            for (i, freq) in self.freq_buffer.iter().enumerate() {
-                let pos = (i as f32 * offset) as usize;
-
-                // cannot be collapsed as clippy notes i think
-                if pos < output_buffer.len() {
-                    // crambling type
-                    if output_buffer[pos].volume < freq.volume {
-                        output_buffer[pos] = Frequency {
-                            volume: freq.volume,
-                            freq: freq.freq,
-                            position: freq.position,
-                        };
-                    }
-                }
+            for freq in bound_buff.iter_mut() {
+                freq.position -= start_pos;
+                freq.position *= end_pos_offset;
             }
 
-            self.freq_buffer = output_buffer;
+            self.freq_buffer = bound_buff;
         }
     }
 }

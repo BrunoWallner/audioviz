@@ -14,7 +14,7 @@ Audioviz is a simple and easy to use library that helps you visualise raw audio-
 * configuration that can be modified at runtime
 * configurable amount of 'bars'
 * configurable refresh rate
-* eq that allows you to manually distribute frequency ranges
+* eq that allows you to manually distribute_frequency_position frequency ranges
 * configurable FFT resolution
 * very simple "interface"
 * multithreaded event based approach

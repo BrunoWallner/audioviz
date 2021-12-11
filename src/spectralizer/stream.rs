@@ -146,9 +146,8 @@ impl Stream {
                                 config.clone().processor,
                                 freq_buffer.clone()
                             );
-                            audio_data.interpolate();
                             audio_data.bound_frequencies();
-                            audio_data.apply_resolution();
+                            audio_data.interpolate();
 
                             sender.send(audio_data.freq_buffer).ok();
                         }
@@ -177,9 +176,11 @@ impl Stream {
                                 );
                                 audio_data.apodize();
                                 audio_data.fft();
-                                audio_data.distribute_volume();
-                                audio_data.distribute();
-                                audio_data.scale_frequencies();
+                                audio_data.normalize_frequency_volume();
+
+                                audio_data.raw_to_freq_buffer();
+                                audio_data.normalize_frequency_position();
+                                audio_data.distribute_frequency_position();
 
                                 let processed_buffer = audio_data.freq_buffer;
 
