@@ -51,7 +51,7 @@ impl Processor {
         }
     }
 
-    // fft algorithm on raw_buffer
+    /// processes fft algorithm on `raw_buffer`
     pub fn fft(&mut self) {
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(self.raw_buffer.len());
@@ -70,7 +70,7 @@ impl Processor {
             self.raw_buffer[0..(self.raw_buffer.len() as f32 * 0.5) as usize].to_vec();
     }
 
-    // distribute_frequency_positions volume on raw_buffer
+    /// normalizes volume on `raw_buffer` so that higher frequencies are louder
     pub fn normalize_frequency_volume(&mut self) {
         match &self.config.volume_normalisation {
             VolumeNormalisation::None => (),
@@ -83,10 +83,7 @@ impl Processor {
         }
     }
 
-    /// distribute_frequency_positions raw_buffer into freq_buffer
-    /// 
-    /// very important even if no frequency_distribution is configured as it transforms 
-    /// `self.raw_buffer` into `self.freq_buffer`  
+    /// manual position distribution on `freq_buffer`
     pub fn distribute_frequency_position(&mut self) {
         if let Some(distribution) = &self.config.frequency_distribution {
             let dis_spline = get_dis_spline(&distribution);
@@ -126,7 +123,7 @@ impl Processor {
         }
     }
 
-    /// populates the freq_buffer and applies volume
+    /// populates the `freq_buffer` and applies volume
     pub fn raw_to_freq_buffer(&mut self) {
           for (i, val) in self.raw_buffer.iter().enumerate() {
               let percentage: f32 = (i + 1) as f32 / self.raw_buffer.len() as f32;
@@ -144,6 +141,7 @@ impl Processor {
         }
     }
 
+    /// applies the position of frequencies in `freq_buffer`, interpolates the gaps and applies resolution
     pub fn interpolate(&mut self) {
         // APPLIES POSITIONS TO FREQUENCIES and interpolation
         // VERY IMPORTANT
@@ -245,6 +243,7 @@ impl Processor {
         };
     }
 
+    /// applies frequency boundaries
     // I am not proud of it but it works
     pub fn bound_frequencies(&mut self) {
         // determines start pos

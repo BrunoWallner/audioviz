@@ -12,7 +12,7 @@
 //! ```
 //! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
 //! use audioviz::spectralizer::stream::{Stream, StreamController};
-//! use audioviz::spectralizer::config::{StreamConfig, ProcessorConfig};
+//! use audioviz::spectralizer::config::StreamConfig;
 //! 
 //! fn main() {
 //!     // captures audio from system using cpal
