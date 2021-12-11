@@ -1,6 +1,14 @@
 # audioviz
-Audioviz is a simple and easy to use library that helps you visualise raw audio-data
+ Audioviz is a simple and easy to use library that helps you visualise raw audio-data
 
+ This is done with the help of the Fast Fourier Transform algorithm,
+ some frequency-space and volume normalisation and optional effects like gravity.
+
+ There are currently only high-level abstractions for live visualisation, where
+ it is consistently fed with data,
+ 
+ but mp3 or wav file abstractions might be added in the future.
+ 
 ## Demo
 ![demo](./media/demo.gif)
 
@@ -16,16 +24,6 @@ Audioviz is a simple and easy to use library that helps you visualise raw audio-
 * system audio capturing using [cpal](https://github.com/RustAudio/cpal)
 * multithreaded event based approach
 * should be possible to implement in any project
-
- Audioviz is a simple and easy to use library that helps you visualise raw audio-data
-
- This is done with the help of the Fast Fourier Transform algorithm,
- some frequency-space and volume normalisation and optional effects like gravity.
-
- There are currently only high-level abstractions for live visualisation, where
- it is consistently fed with data,
- 
- but mp3 or wav file abstractions might be added in the future.
 
  # Code Example with spectralizer
  ```rs
