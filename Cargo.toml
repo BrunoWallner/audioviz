@@ -1,20 +1,21 @@
 [package]
 name = "audioviz"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["Luca <b.lucab1211@gmail.com>"]
 edition = "2018"
 license = "MIT"
-description = "A modular and simple library to make raw audiodata visually more appealing in realtime"
+description = "a simple and easy to use library that helps you visualise raw audio-data"
 readme = "README.md"
 repository = "https://github.com/BrunoWallner/audioviz"
 keywords = ["audio", "FFT", "conversion"]
 categories = ["multimedia::audio"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["cpal"]
 
 [dependencies]
 rustfft = "6.0.1"
 apodize = "1.0.0"
 splines = "4.0.3"
-serde = { version = "1.0.130", features = ["derive"]}
-cpal = "0.13.4"
+serde = { version = "1.0.130", features = ["derive"], optional = true}
+cpal = { "version" = "0.13.4", optional = true }

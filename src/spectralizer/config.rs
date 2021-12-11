@@ -1,13 +1,16 @@
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 // I know it can be replaced with Option<>, but I want to add things in the future
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum VolumeNormalisation {
     None,
     Linear(f32),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Interpolation {
     /// Not recommended
     ///
@@ -60,7 +63,8 @@ pub enum Interpolation {
     Gaps,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessorConfig {
     /// neccessary so that the Audiostream knows what the hightest frequency is. (`sample_rate` / 2)
     pub sample_rate: u32,
@@ -101,7 +105,8 @@ impl Default for ProcessorConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StreamConfig {
     pub processor: ProcessorConfig,
 

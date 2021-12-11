@@ -29,6 +29,7 @@ use crate::spectralizer::{processor::Processor, Frequency};
 use std::sync::mpsc;
 use std::thread;
 
+#[cfg(feature = "cpal")]
 use crate::audio_capture::capture::Capture;
 
 #[derive(Debug, Clone)]
@@ -110,6 +111,7 @@ pub struct Stream {
     event_sender: mpsc::Sender<Event>,
 }
 impl Stream {
+    #[cfg(feature = "cpal")]
     pub fn init_with_capture(capture: Capture, config: StreamConfig) -> Self {
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
