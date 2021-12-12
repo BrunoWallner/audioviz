@@ -17,5 +17,3 @@ impl Default for Config {
         }
     }
 }
-
-pub struct AudioDevice(&'static str);

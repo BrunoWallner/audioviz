@@ -86,7 +86,7 @@ impl Processor {
     /// manual position distribution on `freq_buffer`
     pub fn distribute_frequency_position(&mut self) {
         if let Some(distribution) = &self.config.frequency_distribution {
-            let dis_spline = get_dis_spline(&distribution);
+            let dis_spline = get_dis_spline(distribution);
 
             let freq_buf_len: usize = self.freq_buffer.len();
             let mut last_position: f32 = 0.0;
@@ -110,6 +110,7 @@ impl Processor {
             }
         }
 
+        #[allow(clippy::ptr_arg)]
         fn get_dis_spline(distribution: &Vec<(usize, f32)>) -> Spline<f32, f32> {
             let mut points: Vec<Key<f32, f32>> = Vec::new();
             for freq_dis in distribution.iter() {
@@ -125,14 +126,14 @@ impl Processor {
 
     /// populates the `freq_buffer` and applies volume
     pub fn raw_to_freq_buffer(&mut self) {
-          for (i, val) in self.raw_buffer.iter().enumerate() {
-              let percentage: f32 = (i + 1) as f32 / self.raw_buffer.len() as f32;
-              self.freq_buffer.push( Frequency {
+        for (i, val) in self.raw_buffer.iter().enumerate() {
+            let percentage: f32 = (i + 1) as f32 / self.raw_buffer.len() as f32;
+            self.freq_buffer.push(Frequency {
                 volume: *val * self.config.volume,
                 position: percentage,
-                freq: percentage * (self.config.sample_rate as f32 / 2.0)
-              });
-          }  
+                freq: percentage * (self.config.sample_rate as f32 / 2.0),
+            });
+        }
     }
 
     pub fn normalize_frequency_position(&mut self) {
@@ -147,7 +148,7 @@ impl Processor {
         // VERY IMPORTANT
         let resolution = match self.config.resolution {
             Some(res) => res,
-            None => self.freq_buffer.len()
+            None => self.freq_buffer.len(),
         };
         self.freq_buffer = match self.config.interpolation {
             ConfigInterpolation::None => self.freq_buffer.clone(),
@@ -215,31 +216,33 @@ impl Processor {
                             let gap_size = end - start;
                             if gap_size > 0 {
                                 let percentage: f32 = pos as f32 / gap_size as f32;
-        
-                                let volume: f32 =
-                                    (start_freq.volume * (1.0 - percentage))
-                                    +
-                                    (end_freq.volume * percentage);
-                                let position: f32 =
-                                    (start_freq.position * (1.0 - percentage))
-                                    +
-                                    (end_freq.position * percentage);
-                                let freq: f32 =
-                                    (start_freq.freq * (1.0 - percentage))
-                                    +
-                                    (end_freq.freq * percentage);
-        
-                                o_buf[i] = Frequency {volume, position, freq};
+
+                                let volume: f32 = (start_freq.volume * (1.0 - percentage))
+                                    + (end_freq.volume * percentage);
+                                let position: f32 = (start_freq.position * (1.0 - percentage))
+                                    + (end_freq.position * percentage);
+                                let freq: f32 = (start_freq.freq * (1.0 - percentage))
+                                    + (end_freq.freq * percentage);
+
+                                o_buf[i] = Frequency {
+                                    volume,
+                                    position,
+                                    freq,
+                                };
 
                                 if o_buf.len() > i && self.freq_buffer[i].volume < volume {
-                                    o_buf[i] = Frequency {volume, position, freq};
+                                    o_buf[i] = Frequency {
+                                        volume,
+                                        position,
+                                        freq,
+                                    };
                                 }
                             }
                         }
                     }
                 }
                 o_buf
-            },
+            }
         };
     }
 
@@ -278,7 +281,7 @@ impl Processor {
 
         // bounds
         let mut bound_buff = self.freq_buffer[start..end].to_vec();
-        if bound_buff.len() > 0 {
+        if !bound_buff.is_empty() {
             // fix for first and last frequency's position not being 0 and 1
             let start_pos: f32 = bound_buff[0].position;
             let end_pos: f32 = bound_buff[bound_buff.len() - 1].position - start_pos;

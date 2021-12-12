@@ -1,7 +1,3 @@
-//! abstraction over the processor, where one thread must constantly send the audiodata
-//!
-//! and another thread can request the processed data
-//!
 //! # How it works
 //! ```text
 //!     ┌──────────────────────────┐
@@ -116,16 +112,14 @@ impl Stream {
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
         let e_v = event_sender.clone();
+        let capture_receiver = capture.receiver;
         thread::spawn(move || loop {
-            match capture.receiver.recv() {
-                Ok(data) => {
-                    e_v.send(Event::SendData(data)).ok();
-                }
-                Err(_) => (),
+            if let Ok(data) = capture_receiver.recv() {
+                 e_v.send(Event::SendData(data)).ok();
             }
         });
         Self {
-            event_sender: event_sender,
+            event_sender,
         }
     }
     pub fn init(config: StreamConfig) -> Self {
@@ -146,7 +140,7 @@ impl Stream {
                         Event::RequestData(sender) => {
                             let mut audio_data = Processor::from_frequencies(
                                 config.clone().processor,
-                                freq_buffer.clone()
+                                freq_buffer.clone(),
                             );
                             audio_data.bound_frequencies();
                             audio_data.interpolate();
