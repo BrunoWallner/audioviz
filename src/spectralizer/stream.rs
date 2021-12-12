@@ -7,10 +7,10 @@
 //!           |
 //!           | data stored as `Vec<f32>`
 //!           ↓
-//! ┌──────────────────┐      ┌───────────────────┐        ┌──────────────┐
-//! | StreamController | ---> │      Stream       │ -----> |  Processor   |
-//! |                  | <--- |                   │ <----- |              |
-//! └──────────────────┘      └───────────────────┘        └──────────────┘
+//! ┌──────────────────┐      ┌───────────────────┐        ┌─────────────┐
+//! | StreamController | ---> │      Stream       │ -----> |  Processor  |
+//! |                  | <--- |                   │ <----- |             |
+//! └──────────────────┘      └───────────────────┘        └─────────────┘
 //!        ↑ └----------┐
 //!        └----------┐ |
 //! get_frequencies() | | processed data stored as `Vec<Frequency>`
@@ -22,11 +22,16 @@
 
 use crate::spectralizer::config::{ProcessorConfig, StreamConfig};
 use crate::spectralizer::{processor::Processor, Frequency};
+
 use std::sync::mpsc;
 use std::thread;
 
 #[cfg(feature = "cpal")]
 use crate::audio_capture::capture::Capture;
+
+#[cfg(feature = "cpal")]
+use crate::audio_capture::capture::CaptureEvent;
+
 
 #[derive(Debug, Clone)]
 enum Event {
@@ -108,14 +113,18 @@ pub struct Stream {
 }
 impl Stream {
     #[cfg(feature = "cpal")]
-    pub fn init_with_capture(capture: Capture, config: StreamConfig) -> Self {
+    #[allow(unused_must_use)]
+    pub fn init_with_capture(capture: &Capture, config: StreamConfig) -> Self {
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
         let e_v = event_sender.clone();
-        let capture_receiver = capture.receiver;
+        let capture_receiver = capture.request_receiver().unwrap();
         thread::spawn(move || loop {
-            if let Ok(data) = capture_receiver.recv() {
-                 e_v.send(Event::SendData(data)).ok();
+            if let Ok(event) = capture_receiver.recv() {
+                match event {
+                    CaptureEvent::ReceiveData(data) => { e_v.send(Event::SendData(data)); },
+                    _ => (),
+                }
             }
         });
         Self {

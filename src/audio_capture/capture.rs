@@ -12,9 +12,18 @@ pub enum Error {
     BackendSpecific(String),
 }
 
+// POV of event sender
+#[derive(Clone, Debug)]
+pub enum CaptureEvent {
+    RequestReceiver(mpsc::Sender<mpsc::Receiver<CaptureEvent>>),
+    SendData(Vec<f32>),
+    ReceiveData(Vec<f32>),
+}
+
 pub struct Capture {
     // will receive data in constant intervall from distributor
-    pub receiver: mpsc::Receiver<Vec<f32>>,
+    //pub receiver: mpsc::Receiver<Vec<f32>>,
+    sender: mpsc::Sender<CaptureEvent>,
     _stream: cpal::Stream,
 }
 impl Capture {
@@ -30,12 +39,28 @@ impl Capture {
         };
 
         // initiates distributor
-        thread::spawn(move || init_distributor(dis_receiver, dis_sender, sender, config));
+        let sender_clone = sender.clone();
+        thread::spawn(move || init_distributor(dis_receiver, dis_sender, sender_clone, config));
+
+        // initiates event handler
+        thread::spawn(move || {
+            handle_events(receiver);
+        });
 
         Ok(Self {
-            receiver,
+            sender,
             _stream: stream,
         })
+    }
+
+    #[allow(unused_must_use)]
+    pub fn request_receiver(&self) -> Result<mpsc::Receiver<CaptureEvent>, ()> {
+        let (sender, receiver) = mpsc::channel();
+        self.sender.send(CaptureEvent::RequestReceiver(sender));
+        match receiver.recv() {
+            Ok(r) => Ok(r),
+            Err(_) => Err(())
+        }
     }
 
     pub fn fetch_devices() -> Result<Vec<String>, Error> {
@@ -56,6 +81,32 @@ impl Capture {
         .collect();
 
         Ok(devices)
+    }
+}
+
+#[allow(unused_must_use)]
+fn handle_events(
+    receiver: mpsc::Receiver<CaptureEvent>,
+) {
+    let mut sender: Vec<mpsc::Sender<CaptureEvent>> = Vec::new();
+    loop {
+        if let Ok(event) = receiver.recv() {
+            match event {
+                CaptureEvent::SendData(data) => {
+                    if !sender.is_empty() {
+                        for sender in sender.iter() {
+                            sender.send(CaptureEvent::ReceiveData(data.clone()));
+                        }
+                    }
+                }
+                CaptureEvent::RequestReceiver(outer_sender) => {
+                    let (sen, recv) = mpsc::channel();
+                    sender.push(sen);
+                    outer_sender.send(recv);
+                }
+                CaptureEvent::ReceiveData(_) => { /* should not be sent */ }
+            }
+        }
     }
 }
 
@@ -126,7 +177,7 @@ enum DistributorEvent {
 fn init_distributor(
     receiver: mpsc::Receiver<DistributorEvent>,
     distributor_event_sender: mpsc::Sender<DistributorEvent>,
-    sender: mpsc::Sender<Vec<f32>>,
+    sender: mpsc::Sender<CaptureEvent>,
     config: Config,
 ) {
     let sample_rate: u32 = config.sample_rate.unwrap_or(44_100);
@@ -144,7 +195,9 @@ fn init_distributor(
             DistributorEvent::BufferPushRequest => {
                 if buffer.len() > config.buffer_size as usize {
                     sender
-                        .send(buffer[0..=config.buffer_size as usize].to_vec())
+                        .send(CaptureEvent::SendData(
+                            buffer[0..=config.buffer_size as usize].to_vec())
+                        )
                         .ok();
 
                     // clears already pushed parts

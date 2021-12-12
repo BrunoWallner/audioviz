@@ -19,7 +19,7 @@
 //! let capture = Capture::init(CaptureConfig::default());
 //!
 //! // continuous processing of data received from capture
-//! let audio = Stream::init_with_capture(capture, StreamConfig::default());
+//! let audio = Stream::init_with_capture(&capture, StreamConfig::default());
 //! let audio_controller: StreamController = audio.get_controller();
 //!
 //! loop {
