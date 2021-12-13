@@ -211,32 +211,25 @@ impl Processor {
 
                     if start < resolution && end < resolution {
                         for i in start..=end {
-                            // should be fine
                             let pos: usize = i - start;
                             let gap_size = end - start;
-                            if gap_size > 0 {
-                                let percentage: f32 = pos as f32 / gap_size as f32;
+                            let mut percentage: f32 = pos as f32 / gap_size as f32;
+                            if percentage.is_nan() {percentage = 0.5}
 
-                                let volume: f32 = (start_freq.volume * (1.0 - percentage))
-                                    + (end_freq.volume * percentage);
-                                let position: f32 = (start_freq.position * (1.0 - percentage))
-                                    + (end_freq.position * percentage);
-                                let freq: f32 = (start_freq.freq * (1.0 - percentage))
-                                    + (end_freq.freq * percentage);
+                            // interpolation
+                            let volume: f32 = (start_freq.volume * (1.0 - percentage))
+                                + (end_freq.volume * percentage);
+                            let position: f32 = (start_freq.position * (1.0 - percentage))
+                                + (end_freq.position * percentage);
+                            let freq: f32 = (start_freq.freq * (1.0 - percentage))
+                                + (end_freq.freq * percentage);
 
+                            if o_buf.len() > i && o_buf[i].volume < volume {
                                 o_buf[i] = Frequency {
                                     volume,
                                     position,
                                     freq,
                                 };
-
-                                if o_buf.len() > i && self.freq_buffer[i].volume < volume {
-                                    o_buf[i] = Frequency {
-                                        volume,
-                                        position,
-                                        freq,
-                                    };
-                                }
                             }
                         }
                     }
