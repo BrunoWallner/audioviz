@@ -27,9 +27,10 @@
 
  # Code Example with spectralizer
  ```rs
+ // make sure to enable the `cpal` feature for audio capturing from system
  use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
- use audioviz::spectralizer::stream::{Stream, StreamController};
- use audioviz::spectralizer::config::StreamConfig;
+ use audioviz::spectrum::stream::{Stream, StreamController};
+ use audioviz::spectrum::config::StreamConfig;
  
  fn main() {
      // captures audio from system using cpal

@@ -10,9 +10,11 @@
 //!
 //! # Code Example with spectralizer
 //! ```
+//! // make sure to enable the `cpal` feature for audio capturing from system
 //! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-//! use audioviz::spectralizer::stream::{Stream, StreamController};
-//! use audioviz::spectralizer::config::StreamConfig;
+//! 
+//! use audioviz::spectrum::stream::{Stream, StreamController};
+//! use audioviz::spectrum::config::StreamConfig;
 //!
 //!
 //! // captures audio from system using cpal
@@ -33,7 +35,7 @@
 //! ```
 
 /// seperates continuous audio-data to vector of single frequencies
-pub mod spectralizer;
+pub mod spectrum;
 
 /// captures audio from system using cpal
 #[cfg(feature = "cpal")]

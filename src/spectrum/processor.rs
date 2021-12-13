@@ -1,10 +1,10 @@
 use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
-use crate::spectralizer::config::Interpolation as ConfigInterpolation;
-use crate::spectralizer::config::{ProcessorConfig, VolumeNormalisation};
+use crate::spectrum::config::Interpolation as ConfigInterpolation;
+use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation};
 
-use crate::spectralizer::Frequency;
+use crate::spectrum::Frequency;
 
 /// struct that deals with processing for spectralized output with the help of Fast Fourier Transform
 #[derive(Clone, Debug)]

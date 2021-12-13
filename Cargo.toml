@@ -10,9 +10,6 @@ repository = "https://github.com/BrunoWallner/audioviz"
 keywords = ["audio", "FFT", "conversion"]
 categories = ["multimedia::audio"]
 
-[features]
-default = ["cpal"]
-
 [dependencies]
 rustfft = "6.0.1"
 apodize = "1.0.0"

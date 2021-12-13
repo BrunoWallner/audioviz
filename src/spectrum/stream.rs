@@ -20,8 +20,8 @@
 //!     └─────────────────────────┘
 //! ```
 
-use crate::spectralizer::config::{ProcessorConfig, StreamConfig};
-use crate::spectralizer::{processor::Processor, Frequency};
+use crate::spectrum::config::{ProcessorConfig, StreamConfig};
+use crate::spectrum::{processor::Processor, Frequency};
 
 use std::sync::mpsc;
 use std::thread;
