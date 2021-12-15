@@ -90,14 +90,14 @@ pub struct ProcessorConfig {
     pub volume_normalisation: VolumeNormalisation,
 
     /// to mimic human hearing
-    pub space_normalisation: SpaceNormalisation,
+    pub position_normalisation: SpaceNormalisation,
 
     /// manually apply scale of frequencies
     ///
     /// frequencies around 50hz have double the scale: `vec![ (0, 1.0), (50, 2.0), (20000, 1.0) ]`
     ///
     /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
-    pub frequency_distribution: Option<Vec<(usize, f32)>>,
+    pub manual_position_distribution: Option<Vec<(usize, f32)>>,
 
     pub interpolation: Interpolation,
 }
@@ -109,8 +109,8 @@ impl Default for ProcessorConfig {
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            space_normalisation: SpaceNormalisation::Harmonic,
-            frequency_distribution: Some(vec![(250, 3.0), (1000, 4.0), (2000, 1.0)]),
+            position_normalisation: SpaceNormalisation::Harmonic,
+            manual_position_distribution: None,
             interpolation: Interpolation::Step,
         }
     }

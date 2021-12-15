@@ -85,7 +85,7 @@ impl Processor {
 
     /// manual position distribution on `freq_buffer`
     pub fn distribute_frequency_position(&mut self) {
-        if let Some(distribution) = &self.config.frequency_distribution {
+        if let Some(distribution) = &self.config.manual_position_distribution {
             let dis_spline = get_dis_spline(distribution);
 
             let freq_buf_len: usize = self.freq_buffer.len();
@@ -137,7 +137,7 @@ impl Processor {
     }
 
     pub fn normalize_frequency_position(&mut self) {
-        match self.config.space_normalisation {
+        match self.config.position_normalisation {
             SpaceNormalisation::Exponential(exp) => {
                 for freq in self.freq_buffer.iter_mut() {
                     freq.position = freq.position.powf(exp);
