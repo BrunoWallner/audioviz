@@ -29,9 +29,6 @@ use std::thread;
 #[cfg(feature = "cpal")]
 use crate::audio_capture::capture::Capture;
 
-#[cfg(feature = "cpal")]
-use crate::audio_capture::capture::CaptureEvent;
-
 
 #[derive(Debug, Clone)]
 enum Event {
@@ -72,10 +69,6 @@ impl StreamController {
         self.set_config(config);
     }
 
-    // modifying the amount of bars during runtime will result in unexpected behavior
-    // unless sending 'Event::ClearBuffer' before
-    // because the converter assumes that the bar amount stays the same
-    // could be fixed by modifying ./src/processing/combine_buffers
     pub fn set_config(&self, config: StreamConfig) {
         self.event_sender.send(Event::SendConfig(config)).unwrap();
     }
@@ -118,13 +111,10 @@ impl Stream {
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
         let e_v = event_sender.clone();
-        let capture_receiver = capture.request_receiver().unwrap();
+        let capture_receiver = capture.get_receiver().unwrap();
         thread::spawn(move || loop {
-            if let Ok(event) = capture_receiver.recv() {
-                match event {
-                    CaptureEvent::ReceiveData(data) => { e_v.send(Event::SendData(data)); },
-                    _ => (),
-                }
+            if let Ok(data) = capture_receiver.receive_data() {
+                e_v.send(Event::SendData(data));
             }
         });
         Self {

@@ -14,10 +14,25 @@ pub enum Error {
 
 // POV of event sender
 #[derive(Clone, Debug)]
-pub enum CaptureEvent {
+enum CaptureEvent {
     RequestReceiver(mpsc::Sender<mpsc::Receiver<CaptureEvent>>),
     SendData(Vec<f32>),
     ReceiveData(Vec<f32>),
+}
+
+pub struct CaptureReceiver {
+    receiver: mpsc::Receiver<CaptureEvent>,
+}
+impl CaptureReceiver {
+    pub fn receive_data(&self) -> Result<Vec<f32>, ()> {
+        match self.receiver.recv() {
+            Ok(event) => match event {
+                CaptureEvent::ReceiveData(d) => Ok(d),
+                _ => Err(())
+            }
+            Err(_) => Err(())
+        }
+    }
 }
 
 pub struct Capture {
@@ -54,6 +69,7 @@ impl Capture {
     }
 
     #[allow(unused_must_use)]
+    /*
     pub fn request_receiver(&self) -> Result<mpsc::Receiver<CaptureEvent>, ()> {
         let (sender, receiver) = mpsc::channel();
         self.sender.send(CaptureEvent::RequestReceiver(sender));
@@ -61,6 +77,16 @@ impl Capture {
             Ok(r) => Ok(r),
             Err(_) => Err(())
         }
+    }
+    */
+    pub fn get_receiver(&self) -> Result<CaptureReceiver, ()> {
+        let (sender, receiver) = mpsc::channel();
+        self.sender.send(CaptureEvent::RequestReceiver(sender));
+        let receiver = match receiver.recv() {
+            Ok(r) => r,
+            Err(_) => return Err(())
+        };
+        Ok(CaptureReceiver{receiver})
     }
 
     pub fn fetch_devices() -> Result<Vec<String>, Error> {

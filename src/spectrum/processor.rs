@@ -2,7 +2,7 @@ use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
 use crate::spectrum::config::Interpolation as ConfigInterpolation;
-use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation};
+use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation, SpaceNormalisation};
 
 use crate::spectrum::Frequency;
 
@@ -137,8 +137,28 @@ impl Processor {
     }
 
     pub fn normalize_frequency_position(&mut self) {
-        for freq in self.freq_buffer.iter_mut() {
-            freq.position = freq.position.powf(0.5);
+        match self.config.space_normalisation {
+            SpaceNormalisation::Exponential(exp) => {
+                for freq in self.freq_buffer.iter_mut() {
+                    freq.position = freq.position.powf(exp);
+                } 
+            }
+            SpaceNormalisation::Harmonic => {
+                let mut pos: f32 = 0.0;
+                for (i, freq) in self.freq_buffer.iter_mut().enumerate() {
+                    freq.position = pos;
+                    pos += 1.0 / (i + 1) as f32;
+                }
+
+                // last freq must have position of 1.0
+                let max_pos = match self.freq_buffer.last() {
+                    Some(f) => f.position,
+                    None => 1.0
+                };
+                for freq in self.freq_buffer.iter_mut() {
+                    freq.position *= 1.0 / max_pos;
+                }
+            }
         }
     }
 

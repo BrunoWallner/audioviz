@@ -11,6 +11,13 @@ pub enum VolumeNormalisation {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum SpaceNormalisation {
+    Exponential(f32),
+    Harmonic
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Interpolation {
     /// Not recommended
     ///
@@ -82,6 +89,9 @@ pub struct ProcessorConfig {
     /// to even volume of low and high frequencies
     pub volume_normalisation: VolumeNormalisation,
 
+    /// to mimic human hearing
+    pub space_normalisation: SpaceNormalisation,
+
     /// manually apply scale of frequencies
     ///
     /// frequencies around 50hz have double the scale: `vec![ (0, 1.0), (50, 2.0), (20000, 1.0) ]`
@@ -99,6 +109,7 @@ impl Default for ProcessorConfig {
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
+            space_normalisation: SpaceNormalisation::Harmonic,
             frequency_distribution: Some(vec![(250, 3.0), (1000, 4.0), (2000, 1.0)]),
             interpolation: Interpolation::Step,
         }
