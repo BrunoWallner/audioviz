@@ -11,8 +11,9 @@ pub enum VolumeNormalisation {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum SpaceNormalisation {
-    Exponential(f32),
+pub enum PositionNormalisation {
+    Linear,
+    Exponential,
     Harmonic
 }
 
@@ -90,7 +91,7 @@ pub struct ProcessorConfig {
     pub volume_normalisation: VolumeNormalisation,
 
     /// to mimic human hearing
-    pub position_normalisation: SpaceNormalisation,
+    pub position_normalisation: PositionNormalisation,
 
     /// manually apply scale of frequencies
     ///
@@ -109,7 +110,7 @@ impl Default for ProcessorConfig {
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Linear(0.65),
-            position_normalisation: SpaceNormalisation::Harmonic,
+            position_normalisation: PositionNormalisation::Harmonic,
             manual_position_distribution: None,
             interpolation: Interpolation::Step,
         }
