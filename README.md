@@ -25,6 +25,12 @@
 * multithreaded event based approach
 * should be possible to implement in any project
 
+## Rust features
+| feature | description |
+|---------|-------------|
+| `cpal`  | capturing of systemd audio |
+| `serde` | implementation of Serialize and Deserialize traits |
+
  # Code Example with spectralizer
  ```rs
  // make sure to enable the `cpal` feature for audio capturing from system

@@ -1,4 +1,5 @@
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Config {
     pub sample_rate: Option<u32>,
     pub latency: Option<u32>,
