@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum VolumeNormalisation {
     None,
-    Exponential
+    Exponential,
+    Logarithmic,
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +110,7 @@ impl Default for ProcessorConfig {
             frequency_bounds: [40, 20000],
             resolution: None,
             volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Exponential,
+            volume_normalisation: VolumeNormalisation::Logarithmic,
             position_normalisation: PositionNormalisation::Harmonic,
             manual_position_distribution: None,
             interpolation: Interpolation::Step,
