@@ -78,9 +78,9 @@ impl Processor {
     pub fn normalize_frequency_volume(&mut self) {
         match &self.config.volume_normalisation {
             VolumeNormalisation::None => (),
-            &VolumeNormalisation::Harmonic => {
+            &VolumeNormalisation::Exponential => {
                 for i in 0..self.raw_buffer.len() {
-                    self.raw_buffer[i] *= i as f32;
+                    self.raw_buffer[i] *= (i as f32).sqrt();
                 }
             }
         }
