@@ -14,7 +14,7 @@ pub enum VolumeNormalisation {
 pub enum PositionNormalisation {
     Linear,
     Exponential,
-    Harmonic
+    Harmonic,
 }
 
 #[derive(Debug, Clone)]
