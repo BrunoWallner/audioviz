@@ -44,6 +44,10 @@ impl Processor {
         self.interpolate();
     }
 
+
+    /// applies hanning windowing to `raw_buffer`
+    /// 
+    /// this removes noise
     pub fn apodize(&mut self) {
         let window = apodize::hanning_iter(self.raw_buffer.len()).collect::<Vec<f64>>();
         for (i, value) in self.raw_buffer.iter_mut().enumerate() {
@@ -74,10 +78,9 @@ impl Processor {
     pub fn normalize_frequency_volume(&mut self) {
         match &self.config.volume_normalisation {
             VolumeNormalisation::None => (),
-            VolumeNormalisation::Linear(v) => {
+            &VolumeNormalisation::Harmonic => {
                 for i in 0..self.raw_buffer.len() {
-                    let percentage: f32 = i as f32 / self.raw_buffer.len() as f32;
-                    self.raw_buffer[i] *= percentage.powf(*v);
+                    self.raw_buffer[i] *= i as f32;
                 }
             }
         }

@@ -1,4 +1,4 @@
-/// processes the audiodata
+/// processor of audiodata
 pub mod processor;
 
 /// configs for `processor::Processor` and `stream::Stream`

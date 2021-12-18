@@ -1,3 +1,12 @@
+//! Captures audio from system
+//! 
+//! then sends the data to the distributor which distributes one big buffer into multiple smaller ones
+//! 
+//! this increases overall smoothness at the cost of increased latency
+//! 
+//! On linux it can happen, that alsa prints to stderr
+//! for this I recommend to use `https://github.com/Stebalien/gag-rs`
+
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::mpsc;
 use std::thread;
@@ -12,7 +21,6 @@ pub enum Error {
     BackendSpecific(String),
 }
 
-// POV of event sender
 #[derive(Clone, Debug)]
 enum CaptureEvent {
     RequestReceiver(mpsc::Sender<mpsc::Receiver<CaptureEvent>>),
@@ -37,7 +45,6 @@ impl CaptureReceiver {
 
 pub struct Capture {
     // will receive data in constant intervall from distributor
-    //pub receiver: mpsc::Receiver<Vec<f32>>,
     sender: mpsc::Sender<CaptureEvent>,
     _stream: cpal::Stream,
 }
@@ -68,17 +75,10 @@ impl Capture {
         })
     }
 
+    /// request a receiver that receives the distributed audio data as f32 samples
+    /// 
+    /// you can request multiple receivers out of one Capture
     #[allow(unused_must_use)]
-    /*
-    pub fn request_receiver(&self) -> Result<mpsc::Receiver<CaptureEvent>, ()> {
-        let (sender, receiver) = mpsc::channel();
-        self.sender.send(CaptureEvent::RequestReceiver(sender));
-        match receiver.recv() {
-            Ok(r) => Ok(r),
-            Err(_) => Err(())
-        }
-    }
-    */
     pub fn get_receiver(&self) -> Result<CaptureReceiver, ()> {
         let (sender, receiver) = mpsc::channel();
         self.sender.send(CaptureEvent::RequestReceiver(sender));
