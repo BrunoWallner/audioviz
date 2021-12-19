@@ -8,6 +8,9 @@ pub enum VolumeNormalisation {
     None,
     Exponential,
     Logarithmic,
+
+    /// both Exponential and Logarithmic
+    Mixture,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +28,7 @@ pub enum Interpolation {
     ///
     /// All frequencies are tightly packed together without space distribution applied
     ///
-    /// you would have manually apply positions of frequencies
+    /// you would have to manually apply positions of frequencies and interpolation
     /// ```text
     ///     |
     ///     |
@@ -81,9 +84,7 @@ pub struct ProcessorConfig {
     /// range of frequencies
     pub frequency_bounds: [usize; 2],
 
-    /// number of total frequencies in processed data, None to disable downscaling
-    ///
-    /// max value is length of `input buffer` of raw data / 2
+    /// number of total frequencies in processed data, None to disable up or downscaling
     pub resolution: Option<usize>,
 
     pub volume: f32,
@@ -110,7 +111,7 @@ impl Default for ProcessorConfig {
             frequency_bounds: [40, 20000],
             resolution: None,
             volume: 1.0,
-            volume_normalisation: VolumeNormalisation::Logarithmic,
+            volume_normalisation: VolumeNormalisation::Mixture,
             position_normalisation: PositionNormalisation::Harmonic,
             manual_position_distribution: None,
             interpolation: Interpolation::Step,

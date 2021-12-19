@@ -1,3 +1,25 @@
+//! ## Example without stream abstraction
+//! ```
+//! use audioviz::spectrum::config::ProcessorConfig;
+//! use audioviz::spectrum::processor::Processor;
+//! use audioviz::spectrum::Frequency;
+//! 
+//! fn main() {
+//!     // sample rate must be known and only one channel processing is supported
+//!     let data = vec![0.0, 1.0, 0.0, 0.5, -1.0, 0.043];
+//! 
+//!     let mut processor = Processor::from_raw_data(
+//!         ProcessorConfig::default(), // make sure that sample_rate is correct, default is 44_100hz
+//!         data
+//!     );
+//!     processor.compute_all();
+//! 
+//!     let frequencies: Vec<Frequency> = processor.freq_buffer;
+//! 
+//!     println!("{:#?}", frequencies);
+//! }
+//! ```
+
 use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
@@ -84,11 +106,19 @@ impl Processor {
                     self.raw_buffer[i] *= percentage.sqrt();
                 }
             }
-            &VolumeNormalisation::Logarithmic => {
+            VolumeNormalisation::Logarithmic => {
                 for i in 0..self.raw_buffer.len() {
                     let percentage = (i + 1) as f32 / self.raw_buffer.len() as f32;
                     self.raw_buffer[i] *= 1.0 / 2_f32.log(percentage + 1.0);
                 }
+            }
+            VolumeNormalisation::Mixture => {
+                for i in 0..self.raw_buffer.len() {
+                    let percentage = (i + 1) as f32 / self.raw_buffer.len() as f32;
+                    let log: f32 = 1.0 / 2_f32.log(percentage + 1.0);
+                    let exp: f32 = percentage.sqrt();
+                    self.raw_buffer[i] *= (log + exp) / 2.0;
+                } 
             }
         }
     }

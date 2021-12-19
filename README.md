@@ -31,7 +31,7 @@
 | `cpal`  | capturing of systemd audio |
 | `serde` | implementation of Serialize and Deserialize traits |
 
- # Code Example with spectralizer
+ # Code Example with spectrum
  ```rs
  // make sure to enable the `cpal` feature for audio capturing from system
  use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
@@ -40,7 +40,8 @@
  
  fn main() {
      // captures audio from system using cpal
-     let capture = Capture::init(CaptureConfig::default());
+     let capture = Capture::init(CaptureConfig::default())
+        .unwrap();
  
      // continuous processing of data received from capture
      let audio = Stream::init_with_capture(&capture, StreamConfig::default());
