@@ -116,7 +116,7 @@ impl Default for ProcessorConfig {
             volume_normalisation: VolumeNormalisation::Mixture,
             position_normalisation: PositionNormalisation::Harmonic,
             manual_position_distribution: None,
-            interpolation: Interpolation::Step,
+            interpolation: Interpolation::Bezier,
         }
     }
 }
