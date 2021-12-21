@@ -52,6 +52,8 @@ pub enum Interpolation {
     /// ```
     Step,
 
+    Bezier,
+
     /// ```text
     ///           |
     ///         | | |  

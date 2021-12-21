@@ -226,9 +226,6 @@ impl Processor {
                 }
                 o_buf
             }
-            /*
-            it seems like overlapping is ocurring in low freqs
-            */
             ConfigInterpolation::Step => {
                 let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 let mut freqs = self.freq_buffer.iter().peekable();
@@ -257,16 +254,16 @@ impl Processor {
             ConfigInterpolation::Linear => {
                 let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 let mut freqs = self.freq_buffer.iter().peekable();
-                'interpolating: loop {
+                'linear: loop {
                     let start_freq: &Frequency = match freqs.next() {
                         Some(f) => f,
-                        None => break 'interpolating,
+                        None => break 'linear,
                     };
 
                     let start: usize = (start_freq.position * o_buf.len() as f32) as usize;
                     let end_freq = match freqs.peek() {
                         Some(f) => f,
-                        None => break 'interpolating,
+                        None => break 'linear,
                     };
                     let end: usize = (end_freq.position * o_buf.len() as f32) as usize;
 
@@ -280,10 +277,59 @@ impl Processor {
                             // interpolation
                             let volume: f32 = (start_freq.volume * (1.0 - percentage))
                                 + (end_freq.volume * percentage);
-                            let position: f32 = (start_freq.position * (1.0 - percentage))
-                                + (end_freq.position * percentage);
+
+                            let position: f32 = 0.0;
+
                             let freq: f32 = (start_freq.freq * (1.0 - percentage))
                                 + (end_freq.freq * percentage);
+
+                            if o_buf.len() > i && o_buf[i].volume < volume {
+                                o_buf[i] = Frequency {
+                                    volume,
+                                    position,
+                                    freq,
+                                };
+                            }
+                        }
+                    }
+                }
+                o_buf
+            }
+            ConfigInterpolation::Bezier => {
+                // start_freq.position + (-2 * t ^ 3 + 3 * t ^ 2)(end_freq.position - start_freq.position);
+                let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
+                let mut freqs = self.freq_buffer.iter().peekable();
+                'bezier: loop {
+                    let start_freq: &Frequency = match freqs.next() {
+                        Some(f) => f,
+                        None => break 'bezier,
+                    };
+
+                    let start: usize = (start_freq.position * o_buf.len() as f32) as usize;
+                    let end_freq = match freqs.peek() {
+                        Some(f) => f,
+                        None => break 'bezier,
+                    };
+                    let end: usize = (end_freq.position * o_buf.len() as f32) as usize;
+
+                    if start < resolution && end < resolution {
+                        for i in start..=end {
+                            let pos: usize = i - start;
+                            let gap_size = end - start;
+                            let mut percentage: f32 = pos as f32 / gap_size as f32;
+                            if percentage.is_nan() {percentage = 0.5}
+
+                            let volume: f32 = start_freq.volume + (
+                                -2.0 * percentage.powi(3) +
+                                3.0 * percentage.powi(2)
+                            ) * (end_freq.volume - start_freq.volume);
+
+                            let position: f32 = 0.0;
+
+                            let freq: f32 = start_freq.freq + (
+                                -2.0 * percentage.powi(3) +
+                                3.0 * percentage.powi(2)
+                            ) * (end_freq.freq - start_freq.freq);
 
                             if o_buf.len() > i && o_buf[i].volume < volume {
                                 o_buf[i] = Frequency {
