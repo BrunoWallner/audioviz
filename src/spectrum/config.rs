@@ -52,7 +52,9 @@ pub enum Interpolation {
     /// ```
     Step,
 
-    Bezier,
+    /// best looking, but might be inaccurate
+    /// how it works: http://paulbourke.net/miscellaneous/interpolation/
+    Cubic,
 
     /// ```text
     ///           |
@@ -116,7 +118,7 @@ impl Default for ProcessorConfig {
             volume_normalisation: VolumeNormalisation::Mixture,
             position_normalisation: PositionNormalisation::Harmonic,
             manual_position_distribution: None,
-            interpolation: Interpolation::Bezier,
+            interpolation: Interpolation::Cubic,
         }
     }
 }

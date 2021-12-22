@@ -278,15 +278,13 @@ impl Processor {
                             let volume: f32 = (start_freq.volume * (1.0 - percentage))
                                 + (end_freq.volume * percentage);
 
-                            let position: f32 = 0.0;
-
                             let freq: f32 = (start_freq.freq * (1.0 - percentage))
                                 + (end_freq.freq * percentage);
 
                             if o_buf.len() > i && o_buf[i].volume < volume {
                                 o_buf[i] = Frequency {
                                     volume,
-                                    position,
+                                    position: 0.0, // unneccessary 
                                     freq,
                                 };
                             }
@@ -295,52 +293,61 @@ impl Processor {
                 }
                 o_buf
             }
-            ConfigInterpolation::Bezier => {
-                // start_freq.position + (-2 * t ^ 3 + 3 * t ^ 2)(end_freq.position - start_freq.position);
+            ConfigInterpolation::Cubic => {
                 let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
-                let mut freqs = self.freq_buffer.iter().peekable();
-                'bezier: loop {
-                    let start_freq: &Frequency = match freqs.next() {
-                        Some(f) => f,
-                        None => break 'bezier,
-                    };
 
-                    let start: usize = (start_freq.position * o_buf.len() as f32) as usize;
-                    let end_freq = match freqs.peek() {
-                        Some(f) => f,
-                        None => break 'bezier,
-                    };
-                    let end: usize = (end_freq.position * o_buf.len() as f32) as usize;
+                let mut fb = self.freq_buffer.clone();
 
-                    if start < resolution && end < resolution {
-                        for i in start..=end {
-                            let pos: usize = i - start;
-                            let gap_size = end - start;
-                            let mut percentage: f32 = pos as f32 / gap_size as f32;
-                            if percentage.is_nan() {percentage = 0.5}
+                fb.insert(0, Frequency::empty());
+                fb.push( Frequency::empty() );
 
-                            let volume: f32 = start_freq.volume + (
-                                -2.0 * percentage.powi(3) +
-                                3.0 * percentage.powi(2)
-                            ) * (end_freq.volume - start_freq.volume);
+                if fb.len() > 4 {
+                    for i in 0..fb.len() - 3 {
+                        let y0 = fb[i].volume;
+                        let y1 = fb[i+1].volume;
+                        let y2 = fb[i+2].volume;
+                        let y3 = fb[i+3].volume;
+    
+                        let start = ( fb[i+1].position * o_buf.len() as f32 ) as usize;
+                        let end = ( fb[i+2].position * o_buf.len() as f32 ) as usize;
+    
+                        if start < resolution && end < resolution {
+                            for i in start..=end {
+                                let pos: usize = i - start;
+                                let gap_size = end - start;
+                                let mut percentage: f32 = pos as f32 / gap_size as f32;
+                                if percentage.is_nan() {percentage = 0.5}
+    
+                                let t = percentage;
+                                let t2 = percentage.powi(2);
+    
+                                // explanation: http://paulbourke.net/miscellaneous/interpolation/
+                                // cubic volume interpolation
+                                let a0 = y3 - y2 - y0 + y1;
+                                let a1  = y0 - y1 - a0;
+                                let a2 = y2 - y0;
+                                let a3 = y1;
+    
+                                // math magic
+                                let volume = a0 * t * t2 + a1 * t2 + a2 * t + a3;
 
-                            let position: f32 = 0.0;
-
-                            let freq: f32 = start_freq.freq + (
-                                -2.0 * percentage.powi(3) +
-                                3.0 * percentage.powi(2)
-                            ) * (end_freq.freq - start_freq.freq);
-
-                            if o_buf.len() > i && o_buf[i].volume < volume {
-                                o_buf[i] = Frequency {
-                                    volume,
-                                    position,
-                                    freq,
-                                };
+                                // linear freq interpolation
+                                let f1 = fb[i+1].freq;
+                                let f2 = fb[i+2].freq;
+                                let freq = f1 * (-1.0 + t) + f2 * t;
+    
+                                if o_buf.len() > i && o_buf[i].volume < volume {
+                                    o_buf[i] = Frequency {
+                                        volume,
+                                        position: 0.0, // unneccessary 
+                                        freq,
+                                    };
+                                }
                             }
                         }
                     }
                 }
+
                 o_buf
             }
         };

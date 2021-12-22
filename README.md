@@ -21,6 +21,7 @@
 * Fast Fourier transform via [RustFFT](https://github.com/ejmahler/RustFFT) with space and volume normalisation
 * configuration that can be modified at runtime
 * high-level abstraction but still possible to do everything manually
+* multiple interpolation modes like cubic and linear
 * system audio capturing using [cpal](https://github.com/RustAudio/cpal)
 * multithreaded event based approach
 * should be possible to implement in any project
@@ -56,3 +57,13 @@
      }
  }
  ```
+
+ ## design goals
+ * highly and easily configurable
+ * high level abstraction but preserving the possibility to do everything manually
+ * pretty output
+
+ ### non design goals
+ * lightweight
+ * blazingly fast
+ * scientific accurate output
