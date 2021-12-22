@@ -334,7 +334,7 @@ impl Processor {
                                 // linear freq interpolation
                                 let f1 = fb[i+1].freq;
                                 let f2 = fb[i+2].freq;
-                                let freq = f1 * (-1.0 + t) + f2 * t;
+                                let freq = f1 * (1.0 - t) + f2 * t;
     
                                 if o_buf.len() > i && o_buf[i].volume < volume {
                                     o_buf[i] = Frequency {
