@@ -53,7 +53,7 @@ impl Processor {
         }
     }
 
-    /// process everything in recommended order
+    /// processes everything in recommended order
     pub fn compute_all(&mut self) {
         self.apodize();
         self.fft();
@@ -176,6 +176,7 @@ impl Processor {
         }
     }
 
+    /// makes low frequencies in `freq_buffer` occupy more space so that result is more "readable"
     pub fn normalize_frequency_position(&mut self) {
         match self.config.position_normalisation {
             PositionNormalisation::Linear => (), // already done in `self.raw_to_freq_buffer()`
@@ -203,10 +204,10 @@ impl Processor {
         }
     }
 
-    /// applies the position of frequencies in `freq_buffer`, interpolates the gaps and applies resolution
+    /// applies the position of frequencies in `freq_buffer`
+    /// 
+    /// interpolates the gaps and applies resolution
     pub fn interpolate(&mut self) {
-        // APPLIES POSITIONS TO FREQUENCIES and interpolation
-        // VERY IMPORTANT
         let resolution = match self.config.resolution {
             Some(res) => res,
             None => self.freq_buffer.len(),
