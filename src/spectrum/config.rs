@@ -53,7 +53,6 @@ pub enum Interpolation {
     Step,
 
     /// best looking, but might be inaccurate
-    /// how it works: http://paulbourke.net/miscellaneous/interpolation/
     Cubic,
 
     /// ```text
@@ -89,6 +88,11 @@ pub struct ProcessorConfig {
     pub frequency_bounds: [usize; 2],
 
     /// number of total frequencies in processed data, None to disable up or downscaling
+    /// 
+    /// when `position_normalisation` and `resolution` is `None` no frequency information is lost
+    /// 
+    /// but when `position_normalisation` is set to anything else,
+    /// information will be lost on high frequencies if no upscaling is done.
     pub resolution: Option<usize>,
 
     pub volume: f32,
@@ -97,6 +101,8 @@ pub struct ProcessorConfig {
     pub volume_normalisation: VolumeNormalisation,
 
     /// to mimic human hearing
+    /// 
+    /// might result in information loss on higher frequencies
     pub position_normalisation: PositionNormalisation,
 
     /// manually apply scale of frequencies
@@ -106,6 +112,7 @@ pub struct ProcessorConfig {
     /// this can be applied to an infinite number of frequencies: `vec![ (20, 1.0), (500, 2.0), (5000, 0.5) ... ]`
     pub manual_position_distribution: Option<Vec<(usize, f32)>>,
 
+    /// applies positions of frequencies
     pub interpolation: Interpolation,
 }
 impl Default for ProcessorConfig {

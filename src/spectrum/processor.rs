@@ -312,8 +312,8 @@ impl Processor {
                         let end = ( fb[i+2].position * o_buf.len() as f32 ) as usize;
     
                         if start < resolution && end < resolution {
-                            for i in start..=end {
-                                let pos: usize = i - start;
+                            for j in start..=end {
+                                let pos: usize = j - start;
                                 let gap_size = end - start;
                                 let mut percentage: f32 = pos as f32 / gap_size as f32;
                                 if percentage.is_nan() {percentage = 0.5}
@@ -336,8 +336,8 @@ impl Processor {
                                 let f2 = fb[i+2].freq;
                                 let freq = f1 * (1.0 - t) + f2 * t;
     
-                                if o_buf.len() > i && o_buf[i].volume < volume {
-                                    o_buf[i] = Frequency {
+                                if o_buf.len() > j && o_buf[j].volume < volume {
+                                    o_buf[j] = Frequency {
                                         volume,
                                         position: 0.0, // unneccessary 
                                         freq,
