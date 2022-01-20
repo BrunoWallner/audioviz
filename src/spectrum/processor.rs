@@ -236,17 +236,16 @@ impl Processor {
                         Some(f) => f,
                         None => break 'filling,
                     };
+                    let freq2: &Frequency = match freqs.peek() {
+                        Some(f) => f,
+                        None => break 'filling,
+                    };
 
                     let start: usize = (freq.position * o_buf.len() as f32) as usize;
-                    let end = (match freqs.peek() {
-                        Some(f) => f.position,
-                        None => 1.0,
-                    } * o_buf.len() as f32) as usize;
+                    let end: usize = (freq2.position * o_buf.len() as f32) as usize;
 
                     for i in start..=end {
-                        if o_buf.len() > i && o_buf[i].volume < freq.volume {
-                            o_buf[i] = freq.clone();
-                        }
+                        o_buf[i] = freq.clone();
                     }
                 }
 

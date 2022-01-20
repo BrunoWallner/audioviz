@@ -119,7 +119,7 @@ impl Default for ProcessorConfig {
     fn default() -> Self {
         ProcessorConfig {
             sample_rate: 44_100,
-            frequency_bounds: [40, 20000],
+            frequency_bounds: [50, 20000],
             resolution: None,
             volume: 1.0,
             volume_normalisation: VolumeNormalisation::Mixture,
@@ -136,6 +136,7 @@ pub struct StreamConfig {
     pub processor: ProcessorConfig,
 
     /// with higher resolution comes better precision, that is mostly needed for lower frequencies
+    /// at the cost of latency and 'punchiness'
     pub fft_resolution: usize,
 
     /// should be set to match fps of output, gravity will be affected, because I have not implemented delta-time
@@ -147,9 +148,9 @@ impl Default for StreamConfig {
     fn default() -> Self {
         StreamConfig {
             processor: ProcessorConfig::default(),
-            fft_resolution: 1024 * 4,
+            fft_resolution: 1024 * 2,
             refresh_rate: 60,
-            gravity: Some(2.0),
+            gravity: Some(1.0),
         }
     }
 }

@@ -26,7 +26,7 @@
 //! let audio_controller: StreamController = audio.get_controller();
 //!
 //! loop {
-//!     // stored as Vec<`spectralizer::Frequency`>
+//!     // stored as Vec<`spectrum::Frequency`>
 //!     let data = audio_controller.get_frequencies();
 //!     /*
 //!     do something with data ...
