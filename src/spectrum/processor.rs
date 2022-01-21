@@ -245,7 +245,9 @@ impl Processor {
                     let end: usize = (freq2.position * o_buf.len() as f32) as usize;
 
                     for i in start..=end {
-                        o_buf[i] = freq.clone();
+                        if i < o_buf.len() {
+                            o_buf[i] = freq.clone();
+                        }
                     }
                 }
 
