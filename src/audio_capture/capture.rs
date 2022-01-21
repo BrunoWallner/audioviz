@@ -10,6 +10,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::mpsc;
 use std::thread;
+use std::time::Instant;
 
 use crate::audio_capture::config::Config;
 
@@ -23,22 +24,23 @@ pub enum Error {
 
 #[derive(Clone, Debug)]
 enum CaptureEvent {
-    RequestReceiver(mpsc::Sender<mpsc::Receiver<CaptureEvent>>),
     SendData(Vec<f32>),
-    ReceiveData(Vec<f32>),
+    ReceiveData(mpsc::Sender<Vec<f32>>),
 }
 
 pub struct CaptureReceiver {
-    receiver: mpsc::Receiver<CaptureEvent>,
+    sender: mpsc::Sender<CaptureEvent>
 }
 impl CaptureReceiver {
-    pub fn receive_data(&self) -> Result<Vec<f32>, ()> {
-        match self.receiver.recv() {
-            Ok(event) => match event {
-                CaptureEvent::ReceiveData(d) => Ok(d),
-                _ => Err(())
+    #[allow(unused_must_use)]
+    pub fn receive_data(&self) -> Option<Vec<f32>> {
+        let (sender, receiver) = mpsc::channel();
+        self.sender.send(CaptureEvent::ReceiveData(sender));
+        match receiver.recv() {
+            Ok(val) => {
+                Some(val)
             }
-            Err(_) => Err(())
+            Err(_) => None
         }
     }
 }
@@ -52,17 +54,10 @@ impl Capture {
     pub fn init(config: Config) -> Result<Self, Error> {
         let (sender, receiver) = mpsc::channel();
 
-        // bridge between distributor and sender
-        let (dis_sender, dis_receiver) = mpsc::channel();
-
-        let stream = match stream_audio_to_distributor(dis_sender.clone(), config.clone()) {
+        let stream = match stream_audio_to_distributor(sender.clone(), config.clone()) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
-
-        // initiates distributor
-        let sender_clone = sender.clone();
-        thread::spawn(move || init_distributor(dis_receiver, dis_sender, sender_clone, config));
 
         // initiates event handler
         thread::spawn(move || {
@@ -80,13 +75,8 @@ impl Capture {
     /// you can request multiple receivers out of one Capture
     #[allow(unused_must_use)]
     pub fn get_receiver(&self) -> Result<CaptureReceiver, ()> {
-        let (sender, receiver) = mpsc::channel();
-        self.sender.send(CaptureEvent::RequestReceiver(sender));
-        let receiver = match receiver.recv() {
-            Ok(r) => r,
-            Err(_) => return Err(())
-        };
-        Ok(CaptureReceiver{receiver})
+        let sender = self.sender.clone();
+        Ok(CaptureReceiver{sender})
     }
 
     pub fn fetch_devices() -> Result<Vec<String>, Error> {
@@ -114,30 +104,58 @@ impl Capture {
 fn handle_events(
     receiver: mpsc::Receiver<CaptureEvent>,
 ) {
-    let mut sender: Vec<mpsc::Sender<CaptureEvent>> = Vec::new();
+    let mut sample_rate: f32 = 0.0; // in 1 / ms
+    let mut last_send = Instant::now();
+    let mut last_request = Instant::now(); // in ms
+
+    let mut data: Vec<f32> = Vec::new();
+
     loop {
         if let Ok(event) = receiver.recv() {
             match event {
-                CaptureEvent::SendData(data) => {
-                    if !sender.is_empty() {
-                        for sender in sender.iter() {
-                            sender.send(CaptureEvent::ReceiveData(data.clone()));
-                        }
+                CaptureEvent::SendData(mut d) => {
+                    // calcs sample_rate
+                    let elapsed: u128 = last_send.elapsed().as_nanos();
+                    last_send = Instant::now();
+
+                    sample_rate = d.len() as f32 / elapsed as f32;
+
+                    data.append(&mut d);
+                }
+                CaptureEvent::ReceiveData(sender) => {
+                    let elapsed: u128 = last_request.elapsed().as_nanos(); // time in µs
+                    last_request = Instant::now();
+                    
+                    // approximation of what buffersize that gets sent and deleted
+                    // results in smooth and continous output, replacement of prevoius Distributor
+
+                    // time (in s) = sample_rate (in hz) * buf_size / : sample_rate
+                    // time / sample_rate = buf_size
+                    //
+                    // time ms
+                    // ---------- = buf_size
+                    // sm_r 1/ms
+
+                    let send_amount: usize = ( elapsed as f32 * sample_rate ) as usize + 1;
+                    println!("send_amount: {}\nbuf_size: {}", send_amount, data.len());
+
+                    if data.len() > send_amount {
+                        let d = data[0..send_amount].to_vec();
+                        data.drain(0..send_amount);
+
+                        sender.send(d);
+                    } else {
+                        sender.send(data.clone());
                     }
+                    
                 }
-                CaptureEvent::RequestReceiver(outer_sender) => {
-                    let (sen, recv) = mpsc::channel();
-                    sender.push(sen);
-                    outer_sender.send(recv);
-                }
-                CaptureEvent::ReceiveData(_) => { /* should not be sent */ }
             }
         }
     }
 }
 
 fn stream_audio_to_distributor(
-    sender: mpsc::Sender<DistributorEvent>,
+    sender: mpsc::Sender<CaptureEvent>,
     config: Config,
 ) -> Result<cpal::Stream, Error> {
     let host = cpal::default_host();
@@ -173,7 +191,7 @@ fn stream_audio_to_distributor(
     #[allow(unused_must_use)]
     let stream = match device.build_input_stream(
         &device_config,
-        move |data: &[f32], _: &_| { sender.send(DistributorEvent::IncomingData(data.to_vec())); },
+        move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
         |_| (),
     ) {
         Ok(s) => s,
@@ -194,6 +212,7 @@ fn stream_audio_to_distributor(
     Ok(stream)
 }
 
+/* 
 enum DistributorEvent {
     IncomingData(Vec<f32>),
     BufferPushRequest,
@@ -208,6 +227,10 @@ fn init_distributor(
 ) {
     let sample_rate: u32 = config.sample_rate.unwrap_or(44_100);
     let micros_to_wait: u64 = 1_000_000 / sample_rate as u64 * config.buffer_size as u64;
+
+    time (in s) = send_freq (in hz) * buf_size / : send_freq
+
+    time / send_freq = buf_size
 
     // reduces risk of buffer growing
     let micros_to_wait = (micros_to_wait as f32 * 0.95) as u64;
@@ -229,6 +252,7 @@ fn init_distributor(
                     // clears already pushed parts
                     buffer.drain(0..=config.buffer_size as usize);
                 }
+                println!("distributor")
                 if buffer.len() > config.max_buffer_size as usize {
                     let diff: usize = buffer.len() - config.max_buffer_size as usize;
                     buffer.drain(..diff);
@@ -244,3 +268,4 @@ fn init_distributor(
             .ok();
     });
 }
+*/

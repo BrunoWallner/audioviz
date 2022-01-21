@@ -23,8 +23,9 @@
 use crate::spectrum::config::{ProcessorConfig, StreamConfig};
 use crate::spectrum::{processor::Processor, Frequency};
 
-use std::sync::mpsc;
+use std::sync::mpsc::{self, RecvError};
 use std::thread;
+use std::time::Duration;
 
 #[cfg(feature = "cpal")]
 use crate::audio_capture::capture::Capture;
@@ -50,11 +51,11 @@ impl StreamController {
             .send(Event::SendData(data.to_vec()))
             .unwrap();
     }
-
-    pub fn get_frequencies(&self) -> Vec<Frequency> {
+    #[allow(unused_must_use)]
+    pub fn get_frequencies(&self) -> Result<Vec<Frequency>, RecvError> {
         let (tx, rx) = mpsc::channel();
-        self.event_sender.send(Event::RequestData(tx)).unwrap();
-        rx.recv().unwrap()
+        self.event_sender.send(Event::RequestData(tx));
+        rx.recv()
     }
 
     pub fn adjust_volume(&self, v: f32) {
@@ -108,14 +109,17 @@ impl Stream {
     #[cfg(feature = "cpal")]
     #[allow(unused_must_use)]
     pub fn init_with_capture(capture: &Capture, config: StreamConfig) -> Self {
+        use std::thread::sleep;
+
         let stream = Stream::init(config);
         let event_sender = stream.event_sender;
         let e_v = event_sender.clone();
         let capture_receiver = capture.get_receiver().unwrap();
         thread::spawn(move || loop {
-            if let Ok(data) = capture_receiver.receive_data() {
+            if let Some(data) = capture_receiver.receive_data() {
                 e_v.send(Event::SendData(data));
             }
+            sleep(Duration::from_millis(16));
         });
         Self {
             event_sender,
