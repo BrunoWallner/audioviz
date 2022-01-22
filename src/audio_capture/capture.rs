@@ -104,7 +104,8 @@ impl Capture {
 fn handle_events(
     receiver: mpsc::Receiver<CaptureEvent>,
 ) {
-    let mut sample_rate: f32 = 0.0; // in 1 / ms
+    let mut last_buffer_size: usize = 0;
+    let mut sample_rate: f64 = 0.0; // in 1 / µs
     let mut last_send = Instant::now();
     let mut last_request = Instant::now(); // in ms
 
@@ -114,16 +115,17 @@ fn handle_events(
         if let Ok(event) = receiver.recv() {
             match event {
                 CaptureEvent::SendData(mut d) => {
+                    last_buffer_size = d.len();
                     // calcs sample_rate
-                    let elapsed: u128 = last_send.elapsed().as_nanos();
+                    let elapsed: u128 = last_send.elapsed().as_micros();
                     last_send = Instant::now();
 
-                    sample_rate = d.len() as f32 / elapsed as f32;
+                    sample_rate = d.len() as f64 / elapsed as f64;
 
                     data.append(&mut d);
                 }
                 CaptureEvent::ReceiveData(sender) => {
-                    let elapsed: u128 = last_request.elapsed().as_nanos(); // time in µs
+                    let elapsed: u128 = last_request.elapsed().as_micros(); // time in µs
                     last_request = Instant::now();
                     
                     // approximation of what buffersize that gets sent and deleted
@@ -136,8 +138,7 @@ fn handle_events(
                     // ---------- = buf_size
                     // sm_r 1/ms
 
-                    let send_amount: usize = ( elapsed as f32 * sample_rate ) as usize + 1;
-                    println!("send_amount: {}\nbuf_size: {}", send_amount, data.len());
+                    let send_amount: usize = ( elapsed as f64 * sample_rate ).ceil() as usize;
 
                     if data.len() > send_amount {
                         let d = data[0..send_amount].to_vec();
@@ -146,6 +147,17 @@ fn handle_events(
                         sender.send(d);
                     } else {
                         sender.send(data.clone());
+                    }
+
+                    // prevents buffer to grow indefinetly, can happeen when
+                    // capture runs for hours
+                    let cap: usize = last_buffer_size * 2;
+                    if data.len() > cap && cap != 0 {
+                        log::warn!("force reset of capture buffer");
+                        if data.len() > send_amount {
+                            let oversize: usize = data.len() - send_amount;
+                            data.drain(0..oversize);
+                        }
                     }
                     
                 }
