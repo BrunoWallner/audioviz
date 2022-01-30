@@ -27,7 +27,6 @@ enum CaptureEvent {
     SendData(Vec<f32>),
     ReceiveData(mpsc::Sender<Vec<f32>>),
 }
-
 pub struct CaptureReceiver {
     sender: mpsc::Sender<CaptureEvent>
 }
@@ -122,13 +121,14 @@ fn handle_events(
 
                     sample_rate = d.len() as f64 / elapsed as f64;
 
+                    // d can be negative
                     data.append(&mut d);
                 }
                 CaptureEvent::ReceiveData(sender) => {
                     let elapsed: u128 = last_request.elapsed().as_micros(); // time in µs
                     last_request = Instant::now();
                     
-                    // approximation of what buffersize that gets sent and deleted
+                    // approximation of what buffersize that should get sent and deleted
                     // results in smooth and continous output, replacement of prevoius Distributor
 
                     // time (in s) = sample_rate (in hz) * buf_size / : sample_rate

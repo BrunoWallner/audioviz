@@ -205,8 +205,14 @@ impl Stream {
 
                                         // apply gravity to buffer
                                         for (i, freq) in freq_buffer.iter_mut().enumerate() {
-                                            freq.volume -=
-                                                gravity * 0.0025 * (gravity_time_buffer[i] as f32);
+                                            let gravity: f32 = gravity * 0.0025 * (gravity_time_buffer[i] as f32);
+                                            println!("{}", gravity);
+                                            if freq.volume - gravity >= 0.0 {
+                                                freq.volume -= gravity;
+                                            } else {
+                                                freq.volume = 0.0;
+                                                gravity_time_buffer[i] = 0;
+                                            }
                                         }
                                     }
                                     None => {
