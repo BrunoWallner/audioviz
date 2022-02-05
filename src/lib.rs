@@ -8,34 +8,39 @@
 //!
 //! but mp3 or wav file abstractions might be added in the future.
 //!
-//! # Code Example with spectrum
-//! ```
-//! // make sure to enable the `cpal` feature for audio capturing from system
-//! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-//! 
-//! use audioviz::spectrum::stream::{Stream, StreamController};
-//! use audioviz::spectrum::config::StreamConfig;
+//!# Code Example with spectrum
+//!```rs
+//!use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
+//!use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig}, stream::Stream};
+//!use audioviz::distributor::Distributor;
 //!
+//!fn main() {
+//!    // captures audio from system using cpal
+//!    let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
+//!    let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
-//! // captures audio from system using cpal
-//! let capture = Capture::init(CaptureConfig::default())
-//!     .unwrap();
+//!    // smooths choppy audio data received from audio_receiver
+//!    let mut distributor: Distributor<f32> = Distributor::new();
 //!
-//! // continuous processing of data received from capture
-//! let audio = Stream::init_with_capture(&capture, StreamConfig::default());
-//! let audio_controller: StreamController = audio.get_controller();
+//!    // continuous processing of data received from capture
+//!    let audio = Stream::init_with_capture(&capture, StreamConfig::default());
+//!    let audio_controller: StreamController = audio.get_controller();
 //!
-//! loop {
-//!     // stored as Vec<`spectrum::Frequency`>
-//!     let data = audio_controller.get_frequencies();
-//!     /*
-//!     do something with data ...
-//!     */
-//! }
+//!    // spectrum visualizer stream
+//!    let mut stream: Stream = Stream::new(StreamConfig::default()); 
 //!
-//! ```
+//!    loop {
+//!        // stored as Vec<`spectrum::Frequency`>
+//!        let data = stream.get_frequencies();
+//!        /*
+//!        do something with data ...
+//!        */
+//!    }
+//!}
+//!```
 
 /// seperates continuous audio-data to vector of single frequencies
+#[cfg(feature = "spectrum")]
 pub mod spectrum;
 
 /// captures audio from system using cpal

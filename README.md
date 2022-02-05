@@ -31,39 +31,46 @@
 |---------|-------------|
 | `cpal`  | capturing of systemd audio |
 | `serde` | implementation of Serialize and Deserialize traits |
+| `distributor` | helper for choppy audio-data stream smoothing |
+| `spectrum` | spectrum visualisation module |
 
- # Code Example with spectrum
- ```rs
- // make sure to enable the `cpal` feature for audio capturing from system
- use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
- use audioviz::spectrum::stream::{Stream, StreamController};
- use audioviz::spectrum::config::StreamConfig;
+# Code Example with spectrum
+```rs
+use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
+use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig}, stream::Stream};
+use audioviz::distributor::Distributor;
  
- fn main() {
-     // captures audio from system using cpal
-     let capture = Capture::init(CaptureConfig::default())
-        .unwrap();
- 
-     // continuous processing of data received from capture
-     let audio = Stream::init_with_capture(&capture, StreamConfig::default());
-     let audio_controller: StreamController = audio.get_controller();
- 
-     loop {
-         // stored as Vec<`spectrum::Frequency`>
-         let data = audio_controller.get_frequencies();
-         /*
-         do something with data ...
-         */
-     }
- }
- ```
+fn main() {
+    // captures audio from system using cpal
+    let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
+    let audio_receiver = audio_capture.get_receiver().unwrap();
 
- ## design goals
- * highly and easily configurable
- * high level abstraction but preserving the possibility to do everything manually
- * pretty output
+    // smooths choppy audio data received from audio_receiver
+    let mut distributor: Distributor<f32> = Distributor::new();
 
- ### non design goals
- * lightweight
- * blazingly fast
- * scientific accurate output
+    // continuous processing of data received from capture
+    let audio = Stream::init_with_capture(&capture, StreamConfig::default());
+    let audio_controller: StreamController = audio.get_controller();
+
+    // spectrum visualizer stream
+    let mut stream: Stream = Stream::new(StreamConfig::default()); 
+
+    loop {
+        // stored as Vec<`spectrum::Frequency`>
+        let data = stream.get_frequencies();
+        /*
+        do something with data ...
+        */
+    }
+}
+```
+
+## design goals
+* highly and easily configurable
+* high level abstraction but preserving the possibility to do everything manually
+* pretty output
+
+### non design goals
+* lightweight
+* blazingly fast
+* scientific accurate output

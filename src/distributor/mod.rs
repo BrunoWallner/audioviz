@@ -64,7 +64,7 @@ impl<T: Clone> Distributor<T> {
         // distributor runs for hours
         let cap: usize = self.last_buffer_size * 2;
         if self.data.len() > cap && cap != 0 {
-            log::warn!("force reset of capture buffer");
+            log::warn!("force reset of distribution buffer");
             if self.data.len() > send_amount {
                 let oversize: usize = self.data.len() - send_amount;
                 self.data.drain(0..oversize);

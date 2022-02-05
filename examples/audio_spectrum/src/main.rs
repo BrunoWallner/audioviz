@@ -1,16 +1,25 @@
 use macroquad::prelude::*;
 
 use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-use audioviz::spectrum::{Frequency, config::StreamConfig, stream::Stream};
+use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig}, stream::Stream};
 use audioviz::distributor::Distributor;
 
-#[macroquad::main("AudioScope")]
+#[macroquad::main("AudioSpectrum")]
 async fn main() {
     let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
     let mut distributor: Distributor<f32> = Distributor::new();
-    let mut stream: Stream = Stream::new(StreamConfig::default());
+    let stream_config: StreamConfig = StreamConfig {
+        gravity: Some(5.0),
+        fft_resolution: 1024 * 4,
+        processor: ProcessorConfig {
+            frequency_bounds: [30, 20_000],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut stream: Stream = Stream::new(stream_config);
     loop {
         if let Some(data) = audio_receiver.receive_data() {
             distributor.push(&data);
@@ -20,7 +29,12 @@ async fn main() {
 
         stream.update();
         
-        let frequencies = stream.get_frequencies();
+        let mut frequencies = stream.get_frequencies();
+
+        // mirrors freqs
+        for i in 0..frequencies.len() {
+            frequencies.insert(0, frequencies[i*2].clone())
+        }
 
         clear_background(BLACK);
         
@@ -30,6 +44,7 @@ async fn main() {
 
         let mut freqs = frequencies.iter().peekable();
 	    let mut x: f32 = 0.5;
+
         loop {
             // determines positions of line
             let f1: &Frequency = match freqs.next() {
