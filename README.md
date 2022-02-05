@@ -64,13 +64,3 @@ fn main() {
     }
 }
 ```
-
-## design goals
-* highly and easily configurable
-* high level abstraction but preserving the possibility to do everything manually
-* pretty output
-
-### non design goals
-* lightweight
-* blazingly fast
-* scientific accurate output
