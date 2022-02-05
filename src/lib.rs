@@ -41,3 +41,6 @@ pub mod spectrum;
 /// captures audio from system using cpal
 #[cfg(feature = "cpal")]
 pub mod audio_capture;
+
+#[cfg(feature = "distributor")]
+pub mod distributor;

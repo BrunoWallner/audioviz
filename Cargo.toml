@@ -11,7 +11,8 @@ keywords = ["audio", "FFT", "conversion"]
 categories = ["multimedia::audio"]
 
 [features]
-default = ["cpal"]
+default = ["cpal", "distributor"]
+distributor = []
 
 [dependencies]
 rustfft = "6.0.1"

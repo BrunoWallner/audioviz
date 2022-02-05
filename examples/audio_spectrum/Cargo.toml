@@ -1,5 +1,5 @@
 [package]
-name = "audio_scope"
+name = "audio_spectrum"
 version = "0.1.0"
 edition = "2021"
 

@@ -10,7 +10,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::mpsc;
 use std::thread;
-use std::time::Instant;
 
 use crate::audio_capture::config::Config;
 
@@ -25,7 +24,7 @@ pub enum Error {
 #[derive(Clone, Debug)]
 enum CaptureEvent {
     SendData(Vec<f32>),
-    ReceiveData(mpsc::Sender<Vec<f32>>),
+    ReceiveData(mpsc::Sender<Option<Vec<f32>>>),
 }
 pub struct CaptureReceiver {
     sender: mpsc::Sender<CaptureEvent>
@@ -37,7 +36,7 @@ impl CaptureReceiver {
         self.sender.send(CaptureEvent::ReceiveData(sender));
         match receiver.recv() {
             Ok(val) => {
-                Some(val)
+                val
             }
             Err(_) => None
         }
@@ -103,63 +102,22 @@ impl Capture {
 fn handle_events(
     receiver: mpsc::Receiver<CaptureEvent>,
 ) {
-    let mut last_buffer_size: usize = 0;
-    let mut sample_rate: f64 = 0.0; // in 1 / µs
-    let mut last_send = Instant::now();
-    let mut last_request = Instant::now(); // in ms
-
     let mut data: Vec<f32> = Vec::new();
 
     loop {
         if let Ok(event) = receiver.recv() {
             match event {
                 CaptureEvent::SendData(mut d) => {
-                    last_buffer_size = d.len();
-                    // calcs sample_rate
-                    let elapsed: u128 = last_send.elapsed().as_micros();
-                    last_send = Instant::now();
-
-                    sample_rate = d.len() as f64 / elapsed as f64;
-
-                    // d can be negative
                     data.append(&mut d);
                 }
                 CaptureEvent::ReceiveData(sender) => {
-                    let elapsed: u128 = last_request.elapsed().as_micros(); // time in µs
-                    last_request = Instant::now();
-                    
-                    // approximation of what buffersize that should get sent and deleted
-                    // results in smooth and continous output, replacement of prevoius Distributor
-
-                    // time (in s) = sample_rate (in hz) * buf_size / : sample_rate
-                    // time / sample_rate = buf_size
-                    //
-                    // time ms
-                    // ---------- = buf_size
-                    // sm_r 1/ms
-
-                    let send_amount: usize = ( elapsed as f64 * sample_rate ).ceil() as usize;
-
-                    if data.len() > send_amount {
-                        let d = data[0..send_amount].to_vec();
-                        data.drain(0..send_amount);
-
-                        sender.send(d);
+                   //sender.send(data.clone());
+                    if !data.is_empty() {
+                        sender.send(Some(data.clone()));
                     } else {
-                        sender.send(data.clone());
+                        sender.send(None);
                     }
-
-                    // prevents buffer to grow indefinetly, can happeen when
-                    // capture runs for hours
-                    let cap: usize = last_buffer_size * 2;
-                    if data.len() > cap && cap != 0 {
-                        log::warn!("force reset of capture buffer");
-                        if data.len() > send_amount {
-                            let oversize: usize = data.len() - send_amount;
-                            data.drain(0..oversize);
-                        }
-                    }
-                    
+                   data.drain(..); 
                 }
             }
         }
@@ -223,61 +181,3 @@ fn stream_audio_to_distributor(
 
     Ok(stream)
 }
-
-/* 
-enum DistributorEvent {
-    IncomingData(Vec<f32>),
-    BufferPushRequest,
-}
-
-// converts choppy buffers received from cpal to more continous buffers
-fn init_distributor(
-    receiver: mpsc::Receiver<DistributorEvent>,
-    distributor_event_sender: mpsc::Sender<DistributorEvent>,
-    sender: mpsc::Sender<CaptureEvent>,
-    config: Config,
-) {
-    let sample_rate: u32 = config.sample_rate.unwrap_or(44_100);
-    let micros_to_wait: u64 = 1_000_000 / sample_rate as u64 * config.buffer_size as u64;
-
-    time (in s) = send_freq (in hz) * buf_size / : send_freq
-
-    time / send_freq = buf_size
-
-    // reduces risk of buffer growing
-    let micros_to_wait = (micros_to_wait as f32 * 0.95) as u64;
-
-    let mut buffer: Vec<f32> = Vec::new();
-    thread::spawn(move || loop {
-        if let Ok(event) = receiver.recv() { match event {
-            DistributorEvent::IncomingData(mut data) => {
-                buffer.append(&mut data);
-            }
-            DistributorEvent::BufferPushRequest => {
-                if buffer.len() > config.buffer_size as usize {
-                    sender
-                        .send(CaptureEvent::SendData(
-                            buffer[0..=config.buffer_size as usize].to_vec())
-                        )
-                        .ok();
-
-                    // clears already pushed parts
-                    buffer.drain(0..=config.buffer_size as usize);
-                }
-                println!("distributor")
-                if buffer.len() > config.max_buffer_size as usize {
-                    let diff: usize = buffer.len() - config.max_buffer_size as usize;
-                    buffer.drain(..diff);
-                }
-            }
-        }
-    }});
-
-    thread::spawn(move || loop {
-        thread::sleep(std::time::Duration::from_micros(micros_to_wait));
-        distributor_event_sender
-            .send(DistributorEvent::BufferPushRequest)
-            .ok();
-    });
-}
-*/

@@ -1,29 +1,37 @@
 use macroquad::prelude::*;
 
 use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
+use audioviz::distributor::Distributor;
 
 const SAMPLE_RATE: u64 = 44_100; // in hz
 const BUFFER_DURATION: u64 = 90000; // in µs
 
-#[macroquad::main("BasicShapes")]
+#[macroquad::main("AudioScope")]
 async fn main() {
     let config = CaptureConfig {
         sample_rate: None,
         ..Default::default()
     };
     let audio_capture = Capture::init(config).unwrap();
-    
     let audio_receiver = audio_capture.get_receiver().unwrap();
+
+    let mut distributor: Distributor<f32> = Distributor::new();
 
     let mut buffer: Vec<f32> = Vec::new();
     loop {
-        let mut data = audio_receiver.receive_data().unwrap_or(Vec::new());
-        buffer.append(&mut data);
+        if let Some(data) = audio_receiver.receive_data() {
+            distributor.push(&data);
+        }
 
-        let wanted_buf_size: usize = ((1000.0 / SAMPLE_RATE as f32) * BUFFER_DURATION as f32) as usize; 
-        let drain_amount: usize = buffer.len() - wanted_buf_size;
-        if drain_amount < buffer.len() {
-            buffer.drain(0..drain_amount);
+        let mut data = distributor.pop();
+        if !data.is_empty() {
+            buffer.append(&mut data);
+        }
+
+        let wanted_buf_size: u64 = ((1000.0 / SAMPLE_RATE as f32) * BUFFER_DURATION as f32) as u64; 
+        let drain_amount: isize = buffer.len() as isize - wanted_buf_size as isize;
+        if drain_amount < buffer.len() as isize && drain_amount > 0 {
+            buffer.drain(0..drain_amount as usize);
         }
 
         clear_background(BLACK);
