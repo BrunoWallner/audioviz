@@ -10,8 +10,10 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::mpsc;
 use std::thread;
+use log::warn;
 
 use crate::audio_capture::config::Config;
+use super::converter;
 
 #[derive(Clone, Debug)]
 pub enum Error {
@@ -158,12 +160,45 @@ fn stream_audio_to_distributor(
         },
     };
 
-    #[allow(unused_must_use)]
-    let stream = match device.build_input_stream(
+    let sample_format: cpal::SampleFormat = match device.default_input_config() {
+        Ok(c) => c.sample_format(),
+        Err(_) => return Err(Error::DeviceNotAvailable)
+    };
+
+    /*
+    match device.build_input_stream(
         &device_config,
         move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
         |_| (),
-    ) {
+    */
+
+    #[allow(unused_must_use)]
+    let stream = match sample_format {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &device_config.into(),
+            move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
+            |e| warn!("error occurred on capture-stream: {}", e),
+        ),
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &device_config.into(),
+            move |data: &[i16], _: &_| { 
+                let data = converter::i16_to_f32(data);
+                sender.send(CaptureEvent::SendData(data.to_vec())); 
+            },
+            |e| warn!("error occurred on capture-stream: {}", e),
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &device_config.into(),
+            move |data: &[u16], _: &_| { 
+                let data = converter::u16_to_f32(data);
+                sender.send(CaptureEvent::SendData(data.to_vec())); 
+            },
+            |e| warn!("error occurred on capture-stream: {}", e),
+        ),
+
+    };
+
+    let stream = match stream {
         Ok(s) => s,
         Err(e) => match e {
             cpal::BuildStreamError::DeviceNotAvailable => return Err(Error::DeviceNotAvailable),
