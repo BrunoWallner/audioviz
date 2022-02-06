@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 
 use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig}, stream::Stream};
+use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 use audioviz::distributor::Distributor;
 
 #[macroquad::main("AudioSpectrum")]
@@ -11,10 +11,11 @@ async fn main() {
 
     let mut distributor: Distributor<f32> = Distributor::new();
     let stream_config: StreamConfig = StreamConfig {
-        gravity: Some(5.0),
+        gravity: Some(6.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
-            frequency_bounds: [30, 20_000],
+            frequency_bounds: [50, 20_000],
+	    interpolation: Interpolation::Step,
             ..Default::default()
         },
         ..Default::default()
