@@ -1,7 +1,8 @@
 use macroquad::prelude::*;
 
 use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-use audioviz::distributor::Distributor;
+use audioviz::distributor::{Distributor, Elapsed};
+use std::time::Instant;
 
 const SAMPLE_RATE: u64 = 44_100; // in hz
 const BUFFER_DURATION: u64 = 90000; // in µs
@@ -15,18 +16,24 @@ async fn main() {
     let audio_capture = Capture::init(config).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
-    let mut distributor: Distributor<f32> = Distributor::new();
+    let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
 
     let mut buffer: Vec<f32> = Vec::new();
+
+    // neccessary for distributor
+    let mut delta_push: Instant = Instant::now();
+    let mut delta_pop: Instant = Instant::now();
+
     loop {
         if let Some(data) = audio_receiver.receive_data() {
-            distributor.push(&data);
+            let elapsed = delta_push.elapsed().as_micros();
+            distributor.push(&data, Elapsed::Micros(elapsed));
+            delta_push = Instant::now();
         }
-
-        let mut data = distributor.pop();
-        if !data.is_empty() {
-            buffer.append(&mut data);
-        }
+        let elapsed = delta_pop.elapsed().as_micros();
+        let mut data = distributor.pop(Elapsed::Micros(elapsed));
+        delta_pop = Instant::now();
+        buffer.append(&mut data);
 
         let wanted_buf_size: u64 = ((1000.0 / SAMPLE_RATE as f32) * BUFFER_DURATION as f32) as u64; 
         let drain_amount: isize = buffer.len() as isize - wanted_buf_size as isize;

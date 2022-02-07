@@ -1,76 +1,146 @@
-//! Distributes buffered data, into multiple smaller buffers
+//! Distributes buffered buffer, into multiple smaller buffers
 //! 
-//! It automatically detects sample rate and different delays between data requests are no problem
+//! It automatically detects sample rate and different delays between buffer requests are no problem
 
-use std::time::Instant;
+//! # Example
+//! ```
+//! use audioviz::distributor::{Distributor, Elapsed};
+//! use std::{thread::sleep, time::{Duration, Instant}};
+//! 
+//! fn main() {
+//!     // neccessarry for distribution before data got pushed a second time
+//!     // sample rate because it is impossible to calculate with only one push
+//!     // * 8 because we push 8 items each round,
+//!     // * 4 it loops 4 times per second
+//!     // / 5 because we only push every 5th loop
+//!     let estimated_sample_rate: f64 = 8.0 * 4.0 / 5.0;
+//!     let mut distributor: Distributor<u128> = Distributor::new(estimated_sample_rate);
+//! 
+//!     let mut delta_push: Instant = Instant::now();
+//!     let mut delta_pop: Instant = Instant::now();
+//! 
+//!     let mut counter: u128 = 0;
+//!     loop {
+//!         if counter % 5 == 0 {
+//!             let mut buffer: Vec<u128> = Vec::new();
+//!             for i in 0..=8 {
+//!                 buffer.push(counter + i);
+//!             }
+//! 
+//!             let elapsed = delta_push.elapsed().as_micros();
+//!             delta_push = Instant::now();
+//!             distributor.push(&buffer, Elapsed::Micros(elapsed));
+//!         }
+//! 
+//!         let sample_rate = distributor.sample_rate;
+//!         let whole_data = distributor.clone_buffer();
+//! 
+//!         let elapsed = delta_pop.elapsed().as_micros();
+//!         let data = distributor.pop(Elapsed::Micros(elapsed));
+//!         delta_pop = Instant::now();
+//! 
+//!         println!("sample_rate     : {}", sample_rate);
+//!         println!("whole data      : {:?}", whole_data);
+//!         println!("distributed data: {:?}\n", data);
+//! 
+//!         counter += 1;
+//!         sleep(Duration::from_millis(250));
+//!     }
+//! }
+//! 
+//! ```
 
 #[derive(Clone, Debug)]
 pub struct Distributor<T> {
     last_buffer_size: usize,
-    sample_rate: f64, // in Hz
-    last_send: Option<Instant>,
-    last_request: Option<Instant>,
+    last_pop_size: usize,
 
-    pub data: Vec<T>,
+    /// in Hz
+    pub sample_rate: f64,
+
+    fully_initialized: bool,
+
+    // neccessarry for even better distribution
+    send_amount_excess: f64,
+    pub buffer: Vec<T>,
+}
+
+pub enum Elapsed {
+    Nanos(u128),
+    Micros(u128),
+    Millis(u64)
 }
 
 impl<T: Clone> Distributor<T> {
-    pub fn new() -> Self {
+    pub fn new(estimated_sample_rate: f64) -> Self {
         Self {
             last_buffer_size: 0,
-            sample_rate: 0.0,
-            last_send: None,
-            last_request: None,
+            last_pop_size: 0,
+            sample_rate: estimated_sample_rate,
 
-            data: Vec::new(),
+            fully_initialized: false,
+            send_amount_excess: 0.0,
+            buffer: Vec::new(),
         }
     }
 
-    pub fn push(&mut self, data: &[T]) {
-        self.last_buffer_size = data.len();
+    pub fn clone_buffer(&self) -> Vec<T> {
+        self.buffer.clone()
+    }
 
-        // calculates sample rate
-        let elapsed: u128 = match self.last_send {
-            Some(l) => l.elapsed().as_micros(),
-            None => 0
-        };
-        self.last_send = Some(Instant::now());
+    pub fn push(&mut self, buffer: &[T], elapsed: Elapsed) {
+        self.last_buffer_size = buffer.len();
 
-        self.sample_rate = data.len() as f64 / elapsed as f64 * 1_000_000.0 /* to convert from µHz to Hz */;
+        if self.fully_initialized {
+            self.sample_rate = match elapsed {
+                Elapsed::Nanos(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000_000.0,
+                Elapsed::Micros(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000.0,
+                Elapsed::Millis(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000.0,
+            } 
+        }
 
-        self.data.append(&mut data.to_vec());
+        self.buffer.append(&mut buffer.to_vec());
+        self.fully_initialized = true;
     }
 
     /// array length is unknown and dependent on sample rate and the interval between `pop()` calls
-    pub fn pop(&mut self) -> Vec<T> {
-        let elapsed: u128 = match self.last_request {
-            Some(l) => l.elapsed().as_micros(),
-            None => 0
-        };
-        self.last_request = Some(Instant::now());
-
+    pub fn pop(&mut self, elapsed: Elapsed) -> Vec<T> {
         // calculates what amount to send for continous stream
-        let send_amount: usize = ( (elapsed as f64 / 1_000_000.0 /* to convert from µs to s */) * self.sample_rate ).ceil() as usize;
+        //let send_amount: usize = ( (elapsed as f64 / 1_000_000.0 /* to convert from µs to s */) * self.sample_rate ).round() as usize;
+        let send_amount: f64 = match elapsed {
+            Elapsed::Nanos(elapsed) => (elapsed as f64 / 1_000_000_000.0 /* to convert from ns to s */) * self.sample_rate,
+            Elapsed::Micros(elapsed) => (elapsed as f64 / 1_000_000.0) * self.sample_rate,
+            Elapsed::Millis(elapsed) => (elapsed as f64 / 1_000.0) * self.sample_rate,
+        };
+        self.send_amount_excess += send_amount % 1.0;
+        let mut send_amount = send_amount.floor() as usize;
 
-        let o_data: Vec<T>;
-        if self.data.len() > send_amount {
-            o_data = self.data[0..send_amount].to_vec();
-            self.data.drain(0..send_amount);
+        // handle of send_amount_excess
+        if self.send_amount_excess >= 1.0 {
+            send_amount += 1;
+            self.send_amount_excess -= 1.0;
+        }
+
+        let o_buffer: Vec<T>;
+        if self.buffer.len() > send_amount {
+            o_buffer = self.buffer[0..send_amount].to_vec();
+            self.buffer.drain(0..send_amount);
         } else {
-            o_data = self.data.clone();
+            o_buffer = self.buffer.clone();
+            self.buffer.drain(..);
         }
 
         // prevents buffer to grow indefinetly, can happeen when
         // distributor runs for hours
         let cap: usize = self.last_buffer_size * 2;
-        if self.data.len() > cap && cap != 0 {
+        if self.buffer.len() > cap && cap != 0 {
             log::warn!("force reset of distribution buffer");
-            if self.data.len() > send_amount {
-                let oversize: usize = self.data.len() - send_amount;
-                self.data.drain(0..oversize);
+            if self.buffer.len() > send_amount {
+                let oversize: usize = self.buffer.len() - send_amount;
+                self.buffer.drain(0..oversize);
             }
         }
 
-        o_data
+        o_buffer
     }
 }
