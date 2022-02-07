@@ -49,3 +49,33 @@ pub mod audio_capture;
 
 #[cfg(feature = "distributor")]
 pub mod distributor;
+
+#[cfg(feature = "fft")]
+pub mod fft;
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    use std::path::Path;
+    #[test]
+
+    // will run cargo check for every example
+    fn check_examples() {        
+        let examples: &[&str] = &[
+            "audio_scope",
+            "audio_spectrum",
+            "device_selector",
+            "distributor"
+        ];
+
+        for example in examples {
+            let path = Path::new("examples").join(example);
+            let command = Command::new("cargo")
+                .current_dir(path)
+                .arg("check")
+                .status()
+                .unwrap();
+            assert!(command.success());    
+        }
+    }
+}

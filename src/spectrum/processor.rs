@@ -20,11 +20,11 @@
 //! }
 //! ```
 
-use rustfft::{num_complex::Complex, FftPlanner};
 use splines::{Interpolation, Key, Spline};
 
 use crate::spectrum::config::Interpolation as ConfigInterpolation;
 use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation, PositionNormalisation};
+use crate::fft;
 
 use crate::spectrum::Frequency;
 
@@ -79,21 +79,7 @@ impl Processor {
 
     /// processes fft algorithm on `raw_buffer`
     pub fn fft(&mut self) {
-        let mut planner = FftPlanner::new();
-        let fft = planner.plan_fft_forward(self.raw_buffer.len());
-
-        let mut buffer: Vec<Complex<f32>> = Vec::new();
-        for vol in self.raw_buffer.iter() {
-            buffer.push(Complex { re: *vol, im: 0.0 });
-        }
-        fft.process(&mut buffer[..]);
-
-        for (i, val) in buffer.iter().enumerate() {
-            self.raw_buffer[i] = val.norm();
-        }
-        // remove mirroring
-        self.raw_buffer =
-            self.raw_buffer[0..(self.raw_buffer.len() as f32 * 0.5) as usize].to_vec();
+        self.raw_buffer = fft::process(&self.raw_buffer);
     }
 
     /// normalizes volume on `raw_buffer` so that higher frequencies are louder

@@ -9,18 +9,18 @@
 //! 
 //! fn main() {
 //!     // neccessarry for distribution before data got pushed a second time
-//!     // sample rate because it is impossible to calculate with only one push
+//!     // because sample rate is impossible to calculate with only one push
 //!     // * 8 because we push 8 items each round,
-//!     // * 4 it loops 4 times per second
+//!     // * 20 it loops 4 times per second
 //!     // / 5 because we only push every 5th loop
-//!     let estimated_sample_rate: f64 = 8.0 * 4.0 / 5.0;
+//!     let estimated_sample_rate: f64 = 8.0 * 20.0 / 5.0;
 //!     let mut distributor: Distributor<u128> = Distributor::new(estimated_sample_rate);
 //! 
 //!     let mut delta_push: Instant = Instant::now();
 //!     let mut delta_pop: Instant = Instant::now();
 //! 
 //!     let mut counter: u128 = 0;
-//!     loop {
+//!     'distribution: loop {
 //!         if counter % 5 == 0 {
 //!             let mut buffer: Vec<u128> = Vec::new();
 //!             for i in 0..=8 {
@@ -44,7 +44,11 @@
 //!         println!("distributed data: {:?}\n", data);
 //! 
 //!         counter += 1;
-//!         sleep(Duration::from_millis(250));
+//!         sleep(Duration::from_millis(50));
+//! 
+//!         if counter > 50 {
+//!             break 'distribution;
+//!         }
 //!     }
 //! }
 //! 
