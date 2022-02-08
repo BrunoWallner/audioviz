@@ -13,7 +13,7 @@ async fn main() {
 
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
     let stream_config: StreamConfig = StreamConfig {
-        gravity: None,
+        gravity: Some(6.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
             frequency_bounds: [50, 20_000],
