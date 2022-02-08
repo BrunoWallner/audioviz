@@ -9,34 +9,45 @@
 //! but mp3 or wav file abstractions might be added in the future.
 //!
 //!# Code Example with spectrum
-//!```rs
-//!use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-//!use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig}, stream::Stream};
-//!use audioviz::distributor::Distributor;
+//!```
+//! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
+//! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
+//! use audioviz::distributor::{Distributor, Elapsed};
+//! 
+//! use std::time::Instant;
 //!
-//!fn main() {
-//!    // captures audio from system using cpal
-//!    let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
-//!    let audio_receiver = audio_capture.get_receiver().unwrap();
+//! fn main() {
+//!     // captures audio from system using cpal
+//!     let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
+//!     let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
-//!    // smooths choppy audio data received from audio_receiver
-//!    let mut distributor: Distributor<f32> = Distributor::new();
+//!     // smooths choppy audio data received from audio_receiver
+//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
+//! 
+//!     // neccessary for distributor
+//!     let mut delta_push: Instant = Instant::now();
+//!     let mut delta_pop: Instant = Instant::now();
 //!
-//!    // continuous processing of data received from capture
-//!    let audio = Stream::init_with_capture(&capture, StreamConfig::default());
-//!    let audio_controller: StreamController = audio.get_controller();
-//!
-//!    // spectrum visualizer stream
-//!    let mut stream: Stream = Stream::new(StreamConfig::default()); 
-//!
-//!    loop {
-//!        // stored as Vec<`spectrum::Frequency`>
-//!        let data = stream.get_frequencies();
-//!        /*
-//!        do something with data ...
-//!        */
-//!    }
-//!}
+//!     // spectrum visualizer stream
+//!     let mut stream: Stream = Stream::new(StreamConfig::default()); 
+//!     loop {
+//!         if let Some(data) = audio_receiver.receive_data() {
+//!             let elapsed = delta_push.elapsed().as_micros();
+//!             distributor.push(&data, Elapsed::Micros(elapsed));
+//!             delta_push = Instant::now();
+//!         }
+//!         let elapsed = delta_pop.elapsed().as_micros();
+//!         let data = distributor.pop(Elapsed::Micros(elapsed));
+//!         delta_pop = Instant::now();
+//!         stream.push_data(data);
+//! 
+//!         stream.update();
+//!  
+//!         let frequencies = stream.get_frequencies();
+//! 
+//!         break; // otherwise unittest wont return
+//!     }
+//! }
 //!```
 
 /// seperates continuous audio-data to vector of single frequencies
