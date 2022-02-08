@@ -68,8 +68,11 @@ pub mod fft;
 mod tests {
     use std::process::Command;
     use std::path::Path;
-    #[test]
+    
+    #[cfg(feature = "distributor")]
+    use crate::distributor;
 
+    #[test]
     // will run cargo check for every example
     fn check_examples() {        
         let examples: &[&str] = &[
@@ -88,5 +91,11 @@ mod tests {
                 .unwrap();
             assert!(command.success());    
         }
+    }
+
+    #[cfg(feature = "distributor")]
+    #[test]
+    fn distributor() {
+        distributor::unittest::test();
     }
 }

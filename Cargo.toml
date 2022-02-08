@@ -11,10 +11,12 @@ keywords = ["audio", "FFT", "conversion"]
 categories = ["multimedia::audio"]
 
 [features]
-default = ["cpal", "distributor", "spectrum"]
+default = ["std", "audio_capture", "distributor", "spectrum"]
+audio_capture = ["std", "cpal"]
 distributor = []
 spectrum = ["fft", "apodize", "splines"]
 fft = ["rustfft"]
+std = []
 
 [dependencies]
 # for spectrum

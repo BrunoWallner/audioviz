@@ -2,9 +2,7 @@ use macroquad::prelude::*;
 
 use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
-use audioviz::distributor::{Distributor, Elapsed};
-
-use std::time::Instant;
+use audioviz::distributor::Distributor;
 
 #[macroquad::main("AudioSpectrum")]
 async fn main() {
@@ -24,19 +22,11 @@ async fn main() {
     };
     let mut stream: Stream = Stream::new(stream_config);
 
-    // neccessary for distributor
-    let mut delta_push: Instant = Instant::now();
-    let mut delta_pop: Instant = Instant::now();
-
     loop {
         if let Some(data) = audio_receiver.receive_data() {
-            let elapsed = delta_push.elapsed().as_micros();
-            distributor.push(&data, Elapsed::Micros(elapsed));
-            delta_push = Instant::now();
+            distributor.push_auto(&data);
         }
-        let elapsed = delta_pop.elapsed().as_micros();
-        let data = distributor.pop(Elapsed::Micros(elapsed));
-        delta_pop = Instant::now();
+        let data = distributor.pop_auto();
         stream.push_data(data);
 
         stream.update();
