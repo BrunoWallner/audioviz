@@ -8,7 +8,7 @@ fn main() {
     println!("ID       Device");
     println!("------------------");
     for (i, dev) in devices.iter().enumerate() {
-        println!("{i}\t {}", dev);
+        println!("{}\t {}", i, dev);
     }
 
     let id = match input("id: ").parse::<usize>() {
@@ -20,7 +20,7 @@ fn main() {
     };
     let device = devices[id].clone();
 
-    println!("capturing audio from: {device}");
+    println!("capturing audio from: {}", device);
     let config = CaptureConfig {
         device,
         ..Default::default()
