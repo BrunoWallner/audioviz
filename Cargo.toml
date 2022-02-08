@@ -13,13 +13,17 @@ categories = ["multimedia::audio"]
 [features]
 default = ["cpal", "distributor", "spectrum"]
 distributor = []
-spectrum = ["fft"]
-fft = []
+spectrum = ["fft", "apodize", "splines"]
+fft = ["rustfft"]
 
 [dependencies]
-rustfft = "6.0.1"
-apodize = "1.0.0"
-splines = "4.0.3"
+# for spectrum
+apodize = { version = "1.0.0", optional = true }
+splines = { version = "4.0.3", optional = true }
+
 serde = { version = "1.0.130", features = ["derive"], optional = true}
 cpal = { "version" = "0.13.4", optional = true }
 log = "0.4.14"
+
+# for fft
+rustfft = { version = "6.0.1", optional = true }
