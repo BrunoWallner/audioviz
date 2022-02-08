@@ -23,7 +23,9 @@ pub(crate) fn test() {
 
         // if sample rate is fully known with 2 pushes
         if counter >= 10 {
-        assert!(data.len() > 0);
+            assert!(data.len() > 0);
+            let buf_len = distributor.clone_buffer().len();
+            assert!(buf_len <= 16);
         }
 
         counter += 1;
