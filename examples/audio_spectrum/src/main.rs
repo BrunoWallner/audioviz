@@ -31,12 +31,7 @@ async fn main() {
 
         stream.update();
         
-        let mut frequencies = stream.get_frequencies();
-
-        // mirrors freqs
-        for i in 0..frequencies.len() {
-            frequencies.insert(0, frequencies[i*2].clone())
-        }
+        let frequencies = stream.get_frequencies();
 
         clear_background(BLACK);
         

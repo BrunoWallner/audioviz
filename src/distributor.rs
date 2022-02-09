@@ -1,6 +1,11 @@
-//! Distributes buffered buffer, into multiple smaller buffers
+//! Can receive buffers of any length, calculates it data rate
+//! and then determines how much data it should give away on each `pop()` call
 //! 
-//! It automatically detects sample rate and different delays between buffer requests are no problem
+//! different delays and buffer lengths between buffer requests are no problem
+//! 
+//! data rate should be known beforehand, but if this is not the case it is
+//! recommended to manually call `clear()` after the second time data got pushed into it, 
+//! before it is done forcefully
 
 //! # Example with manual time measurement
 //! ```
@@ -10,11 +15,13 @@
 //! fn main() {
 //!     // neccessarry for distribution before data got pushed a second time
 //!     // because sample rate is impossible to calculate with only one push
+//!     // wrong rate results in bigger latency, which can be circumvented by
+//!     // calling `distributor.clear()` after second push
 //!     // * 8 because we push 8 items each round,
-//!     // * 20 it loops 4 times per second
+//!     // * 1000 because it loops 1000 times per second
 //!     // / 5 because we only push every 5th loop
-//!     let estimated_sample_rate: f64 = 8.0 * 20.0 / 5.0;
-//!     let mut distributor: Distributor<u128> = Distributor::new(estimated_sample_rate);
+//!     let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
+//!     let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate);
 //! 
 //!     let mut delta_push: Instant = Instant::now();
 //!     let mut delta_pop: Instant = Instant::now();
@@ -32,14 +39,14 @@
 //!             distributor.push(&buffer, Elapsed::Micros(elapsed));
 //!         }
 //! 
-//!         let sample_rate = distributor.sample_rate;
+//!         let data_rate = distributor.data_rate;
 //!         let whole_data = distributor.clone_buffer();
 //! 
 //!         let elapsed = delta_pop.elapsed().as_micros();
 //!         let data = distributor.pop(Elapsed::Micros(elapsed));
 //!         delta_pop = Instant::now();
 //! 
-//!         println!("sample_rate     : {}", sample_rate);
+//!         println!("data_rate     : {}", data_rate);
 //!         println!("whole data      : {:?}", whole_data);
 //!         println!("distributed data: {:?}\n", data);
 //! 
@@ -54,18 +61,18 @@
 //! 
 //! ```
 //! 
+//! If the `std` feature is enabled, time measurement can done by the Distributor itself
+//! using `pop_auto()` and `push_auto()`
 #[cfg(feature = "std")]
 use std::time::Instant;
-
-pub(crate) mod unittest;
 
 #[derive(Clone, Debug)]
 pub struct Distributor<T> {
     last_buffer_size: usize,
     last_pop_size: usize,
 
-    /// in Hz
-    pub sample_rate: f64,
+    /// in data bits per second, (Hz)
+    pub data_rate: f64,
 
     fully_initialized: bool,
 
@@ -87,12 +94,12 @@ pub enum Elapsed {
 }
 
 impl<T: Clone> Distributor<T> {
-    pub fn new(estimated_sample_rate: f64) -> Self {
+    pub fn new(estimated_data_rate: f64) -> Self {
         #[cfg(not(feature = "std"))]
         return Self {
             last_buffer_size: 0,
             last_pop_size: 0,
-            sample_rate: estimated_sample_rate,
+            data_rate: estimated_data_rate,
 
             fully_initialized: false,
             send_amount_excess: 0.0,
@@ -103,7 +110,7 @@ impl<T: Clone> Distributor<T> {
         return Self {
             last_buffer_size: 0,
             last_pop_size: 0,
-            sample_rate: estimated_sample_rate,
+            data_rate: estimated_data_rate,
 
             fully_initialized: false,
             send_amount_excess: 0.0,
@@ -118,11 +125,15 @@ impl<T: Clone> Distributor<T> {
         self.buffer.clone()
     }
 
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
     pub fn push(&mut self, buffer: &[T], elapsed: Elapsed) {
         self.last_buffer_size = buffer.len();
 
         if self.fully_initialized {
-            self.sample_rate = match elapsed {
+            self.data_rate = match elapsed {
                 Elapsed::Nanos(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000_000.0,
                 Elapsed::Micros(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000.0,
                 Elapsed::Millis(elapsed) => (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000.0,
@@ -142,7 +153,7 @@ impl<T: Clone> Distributor<T> {
         self.push_elapsed = Instant::now();
 
         if self.fully_initialized {
-            self.sample_rate = (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000.0;
+            self.data_rate = (buffer.len() - self.last_pop_size) as f64 / elapsed as f64 * 1_000_000.0;
         }
 
         self.buffer.append(&mut buffer.to_vec());
@@ -151,11 +162,11 @@ impl<T: Clone> Distributor<T> {
     /// array length is unknown and dependent on sample rate and the interval between `pop()` calls
     pub fn pop(&mut self, elapsed: Elapsed) -> Vec<T> {
         // calculates what amount to send for continous stream
-        //let send_amount: usize = ( (elapsed as f64 / 1_000_000.0 /* to convert from µs to s */) * self.sample_rate ).round() as usize;
+        //let send_amount: usize = ( (elapsed as f64 / 1_000_000.0 /* to convert from µs to s */) * self.data_rate ).round() as usize;
         let send_amount: f64 = match elapsed {
-            Elapsed::Nanos(elapsed) => (elapsed as f64 / 1_000_000_000.0 /* to convert from ns to s */) * self.sample_rate,
-            Elapsed::Micros(elapsed) => (elapsed as f64 / 1_000_000.0) * self.sample_rate,
-            Elapsed::Millis(elapsed) => (elapsed as f64 / 1_000.0) * self.sample_rate,
+            Elapsed::Nanos(elapsed) => (elapsed as f64 / 1_000_000_000.0 /* to convert from ns to s */) * self.data_rate,
+            Elapsed::Micros(elapsed) => (elapsed as f64 / 1_000_000.0) * self.data_rate,
+            Elapsed::Millis(elapsed) => (elapsed as f64 / 1_000.0) * self.data_rate,
         };
         self.send_amount_excess += send_amount % 1.0;
         let mut send_amount = send_amount.floor() as usize;
@@ -196,7 +207,7 @@ impl<T: Clone> Distributor<T> {
         let elapsed = self.pop_elapsed.elapsed().as_micros();
         self.pop_elapsed = Instant::now();
 
-        let send_amount: f64 = (elapsed as f64 / 1_000_000.0) * self.sample_rate;
+        let send_amount: f64 = (elapsed as f64 / 1_000_000.0) * self.data_rate;
         self.send_amount_excess += send_amount % 1.0;
         let mut send_amount = send_amount.floor() as usize;
 

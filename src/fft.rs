@@ -23,33 +23,3 @@ pub fn process(data: &[f32]) -> Vec<f32> {
 
     buffer
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn fft() {
-        let mut buffer: Vec<f32> = Vec::new();
-
-        let mut x: f32 = 0.0;
-        for _ in 0..16 {
-            buffer.push(x.sin());
-            x += 0.1;
-        }
-    
-        let fft = super::process(&buffer);
-
-        assert_eq!(
-            fft,
-            vec![
-                9.78363,
-                2.9537609,
-                1.4024371,
-                0.95359206,
-                0.74589825,
-                0.63307375,
-                0.569189,
-                0.5359103,         
-            ]
-        )
-    }
-}

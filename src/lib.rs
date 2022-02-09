@@ -70,7 +70,10 @@ mod tests {
     use std::path::Path;
     
     #[cfg(feature = "distributor")]
-    use crate::distributor;
+    use crate::distributor::Distributor;
+
+    #[cfg(feature = "fft")]
+    use crate::fft;
 
     #[test]
     // will run cargo check for every example
@@ -94,8 +97,71 @@ mod tests {
     }
 
     #[cfg(feature = "distributor")]
+    #[cfg(feature = "std")]
     #[test]
     fn distributor() {
-        distributor::unittest::test();
+        use std::{time::Duration, thread::sleep};
+        use Distributor;
+
+        let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
+        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate);
+
+        let mut counter: u128 = 0;
+        'distribution: loop {
+            if counter % 5 == 0 {
+                let mut buffer: Vec<u128> = Vec::new();
+                for _ in 0..=8 {
+                    buffer.push(0);
+                }
+
+                distributor.push_auto(&buffer);
+            }
+
+            let data = distributor.pop_auto();
+            let buf_len = distributor.clone_buffer().len();
+
+            // if sample rate is fully known with 2 pushes
+            if counter >= 10 {
+                assert!(data.len() > 0);
+                assert!(buf_len <= 16);
+            }
+
+            counter += 1;
+            sleep(Duration::from_millis(1));
+
+            if counter > 100 {
+                break 'distribution;
+            }
+        }
     }
+
+    #[cfg(feature = "fft")]
+    #[test]
+    fn fft() {
+        let mut buffer: Vec<f32> = Vec::new();
+
+        let mut x: f32 = 0.0;
+        for _ in 0..16 {
+            buffer.push(x.sin());
+            x += 0.1;
+        }
+    
+        let fft = fft::process(&buffer);
+    
+        assert_eq!(
+            fft,
+            vec![
+                9.78363,
+                2.9537609,
+                1.4024371,
+                0.95359206,
+                0.74589825,
+                0.63307375,
+                0.569189,
+                0.5359103,         
+            ]
+        )
+    }
+
+
 }
