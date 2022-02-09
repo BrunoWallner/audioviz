@@ -16,7 +16,7 @@ async fn main() {
     let audio_capture = Capture::init(config).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
-    let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
+    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, 5000);
 
     let mut buffer: Vec<f32> = Vec::new();
 

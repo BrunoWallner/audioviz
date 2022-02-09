@@ -10,7 +10,7 @@ fn main() {
     // * 4 it loops 4 times per second
     // / 5 because we only push every 5th loop
     let estimated_data_rate: f64 = 8.0 * 4.0 / 5.0;
-    let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate);
+    let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, 64);
 
     let mut delta_push: Instant = Instant::now();
     let mut delta_pop: Instant = Instant::now();
@@ -18,7 +18,8 @@ fn main() {
     let mut counter: u128 = 0;
     let mut value: u128 = 0;
     loop {
-        if counter % 5 == 0 {
+        let len = rand::thread_rng().gen_range(3..=8);
+        if counter % len == 0 {
             let mut buffer: Vec<u128> = Vec::new();
             let len = rand::thread_rng().gen_range(1..16);
             for _ in 0..=len {

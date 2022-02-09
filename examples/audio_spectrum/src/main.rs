@@ -9,7 +9,7 @@ async fn main() {
     let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
-    let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
+    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, 5000);
     let stream_config: StreamConfig = StreamConfig {
         gravity: Some(6.0),
         fft_resolution: 1024 * 4,

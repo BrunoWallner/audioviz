@@ -22,7 +22,7 @@
 //!     let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
 //!     // smooths choppy audio data received from audio_receiver
-//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0);
+//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, 64);
 //! 
 //!     // neccessary for distributor
 //!     let mut delta_push: Instant = Instant::now();
@@ -104,7 +104,7 @@ mod tests {
         use Distributor;
 
         let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
-        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate);
+        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, 32);
 
         let mut counter: u128 = 0;
         'distribution: loop {
