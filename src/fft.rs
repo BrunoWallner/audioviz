@@ -1,3 +1,8 @@
+//! Fast Fourier Transform algorithm
+//! necessary to transform audio-data to a representation in the frequency domain
+//! 
+//! dependency of `spectrum`
+
 use rustfft::{num_complex::Complex, FftPlanner};
 
 pub fn process(data: &[f32]) -> Vec<f32> {

@@ -5,7 +5,7 @@
 //! 
 //! data rate should be known beforehand, but if this is not the case it is
 //! recommended to manually call `clear()` after the second time data got pushed into it, 
-//! before it is done forcefully
+//! before it is done forcefully to reduce latency
 
 //! # Example with manual time measurement
 //! ```
@@ -61,7 +61,7 @@
 //! 
 //! ```
 //! 
-//! If the `std` feature is enabled, time measurement can done by the Distributor itself
+//! If the `std` feature is enabled, time measurement can be done by the Distributor itself
 //! using `pop_auto()` and `push_auto()`
 #[cfg(feature = "std")]
 use std::time::Instant;
