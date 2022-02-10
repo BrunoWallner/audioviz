@@ -21,7 +21,7 @@
 //!     // * 1000 because it loops 1000 times per second
 //!     // / 5 because we only push every 5th loop
 //!     let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
-//!     let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, 64);
+//!     let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, Some(64));
 //! 
 //!     let mut delta_push: Instant = Instant::now();
 //!     let mut delta_pop: Instant = Instant::now();
@@ -43,7 +43,7 @@
 //!         let whole_data = distributor.clone_buffer();
 //! 
 //!         let elapsed = delta_pop.elapsed().as_micros();
-//!         let data = distributor.pop(Elapsed::Micros(elapsed));
+//!         let data = distributor.pop(Elapsed::Micros(elapsed), None);
 //!         delta_pop = Instant::now();
 //! 
 //!         println!("data_rate     : {}", data_rate);
@@ -74,7 +74,7 @@ pub struct Distributor<T> {
     /// in data bits per second, (Hz)
     pub data_rate: f64,
 
-    pub max_buffer_length: usize,
+    pub max_buffer_length: Option<usize>,
 
     fully_initialized: bool,
 
@@ -96,7 +96,7 @@ pub enum Elapsed {
 }
 
 impl<T: Clone> Distributor<T> {
-    pub fn new(estimated_data_rate: f64, max_buffer_length: usize) -> Self {
+    pub fn new(estimated_data_rate: f64, max_buffer_length: Option<usize>) -> Self {
         #[cfg(not(feature = "std"))]
         return Self {
             last_buffer_size: 0,
@@ -164,15 +164,23 @@ impl<T: Clone> Distributor<T> {
         self.buffer.append(&mut buffer.to_vec());
         self.fully_initialized = true;
     }
-    /// array length is unknown and dependent on sample rate and the interval between `pop()` calls
-    pub fn pop(&mut self, elapsed: Elapsed) -> Vec<T> {
+    /// array length is unknown and dependent data_rate and the interval between `pop()` calls
+    /// 
+    /// use `None` on `manual_data_rate` to use calculated data rate
+    pub fn pop(&mut self, elapsed: Elapsed, manual_data_rate: Option<f64>) -> Vec<T> {
         // calculates what amount to send for continous stream
         //let send_amount: usize = ( (elapsed as f64 / 1_000_000.0 /* to convert from µs to s */) * self.data_rate ).round() as usize;
-        let send_amount: f64 = match elapsed {
-            Elapsed::Nanos(elapsed) => (elapsed as f64 / 1_000_000_000.0 /* to convert from ns to s */) * self.data_rate,
-            Elapsed::Micros(elapsed) => (elapsed as f64 / 1_000_000.0) * self.data_rate,
-            Elapsed::Millis(elapsed) => (elapsed as f64 / 1_000.0) * self.data_rate,
+        let mut send_amount: f64 = match elapsed {
+            Elapsed::Nanos(elapsed) => elapsed as f64 / 1_000_000_000.0, /* to convert from ns to s */
+            Elapsed::Micros(elapsed) => elapsed as f64 / 1_000_000.0,
+            Elapsed::Millis(elapsed) => elapsed as f64 / 1_000.0,
         };
+        if let Some(data_rate) = manual_data_rate {
+            send_amount *= data_rate
+        } else {
+            send_amount *= self.data_rate
+        };
+
         self.send_amount_excess += send_amount % 1.0;
         let mut send_amount = send_amount.floor() as usize;
 
@@ -193,12 +201,14 @@ impl<T: Clone> Distributor<T> {
 
         // prevents buffer to grow indefinetly, can happeen when
         // distributor runs for hours
-        let cap: usize = self.max_buffer_length;
-        if self.buffer.len() > cap && cap != 0 {
-            log::warn!("force reset of distribution buffer");
-            if self.buffer.len() > send_amount {
-                let oversize: usize = self.buffer.len() - send_amount;
-                self.buffer.drain(0..oversize);
+        if let Some(max_buffer_length) = self.max_buffer_length {
+            let cap: usize = max_buffer_length;
+            if self.buffer.len() > cap && cap != 0 {
+                log::warn!("force reset of distribution buffer");
+                if self.buffer.len() > send_amount {
+                    let oversize: usize = self.buffer.len() - send_amount;
+                    self.buffer.drain(0..oversize);
+                }
             }
         }
 
@@ -207,12 +217,18 @@ impl<T: Clone> Distributor<T> {
 
     #[cfg(feature = "std")]
     /// same as `pop()` but with automatic time measurement
-    pub fn pop_auto(&mut self) -> Vec<T> {
+    pub fn pop_auto(&mut self, manual_data_rate: Option<f64>) -> Vec<T> {
         // calculates what amount to send for continous stream
         let elapsed = self.pop_elapsed.elapsed().as_micros();
         self.pop_elapsed = Instant::now();
 
-        let send_amount: f64 = (elapsed as f64 / 1_000_000.0) * self.data_rate;
+        let mut send_amount: f64 = elapsed as f64 / 1_000_000.0;
+        if let Some(data_rate) = manual_data_rate {
+            send_amount *= data_rate
+        } else {
+            send_amount *= self.data_rate
+        };
+
         self.send_amount_excess += send_amount % 1.0;
         let mut send_amount = send_amount.floor() as usize;
 
@@ -233,12 +249,14 @@ impl<T: Clone> Distributor<T> {
 
         // prevents buffer to grow indefinetly, can happeen when
         // distributor runs for hours
-        let cap: usize = self.max_buffer_length;
-        if self.buffer.len() > cap && cap != 0 {
-            log::warn!("force reset of distribution buffer");
-            if self.buffer.len() > send_amount {
-                let oversize: usize = self.buffer.len() - send_amount;
-                self.buffer.drain(0..oversize);
+        if let Some(max_buffer_length) = self.max_buffer_length {
+            let cap: usize = max_buffer_length;
+            if self.buffer.len() > cap && cap != 0 {
+                log::warn!("force reset of distribution buffer");
+                if self.buffer.len() > send_amount {
+                    let oversize: usize = self.buffer.len() - send_amount;
+                    self.buffer.drain(0..oversize);
+                }
             }
         }
 

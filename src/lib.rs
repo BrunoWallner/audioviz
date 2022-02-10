@@ -1,20 +1,17 @@
 //! Audioviz is a simple and easy to use library that helps you visualise raw audio-data
 //!
-//! This is done with the help of the Fast Fourier Transform algorithm,
-//! some frequency-space and volume normalisation and optional effects like gravity.
-//!
-//! There are currently only high-level abstractions for live visualisation, where
-//! it is consistently fed with data,
-//!
-//! but mp3 or wav file abstractions might be added in the future.
+//! ### It consists of multiple modules:
+//! - [**fft**](./fft/index.html) Fast Fourier Transform algorithm, which transforms audio-data to a representation in the frequency domain.
+//! - [**spectrum**](./spectrum/index.html) high level and easier to use abstraction over [**fft**](./fft/index.html)
+//! - [**distributor**](./distributor/index.html) distributes big buffers into smaller ones.
+//!   Results in much smoother output of `distributor` when applied.
+//! - [**audio_capture**](./audio_capture/index.html) captures system audio using [CPAL](https://github.com/RustAudio/cpal).
 //!
 //!# Code Example with spectrum
 //!```
 //! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
 //! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
-//! use audioviz::distributor::{Distributor, Elapsed};
-//! 
-//! use std::time::Instant;
+//! use audioviz::distributor::Distributor;
 //!
 //! fn main() {
 //!     // captures audio from system using cpal
@@ -22,23 +19,15 @@
 //!     let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
 //!     // smooths choppy audio data received from audio_receiver
-//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, 64);
-//! 
-//!     // neccessary for distributor
-//!     let mut delta_push: Instant = Instant::now();
-//!     let mut delta_pop: Instant = Instant::now();
+//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(8128));
 //!
 //!     // spectrum visualizer stream
 //!     let mut stream: Stream = Stream::new(StreamConfig::default()); 
 //!     loop {
 //!         if let Some(data) = audio_receiver.receive_data() {
-//!             let elapsed = delta_push.elapsed().as_micros();
-//!             distributor.push(&data, Elapsed::Micros(elapsed));
-//!             delta_push = Instant::now();
+//!             distributor.push_auto(&data);
 //!         }
-//!         let elapsed = delta_pop.elapsed().as_micros();
-//!         let data = distributor.pop(Elapsed::Micros(elapsed));
-//!         delta_pop = Instant::now();
+//!         let data = distributor.pop_auto(None);
 //!         stream.push_data(data);
 //! 
 //!         stream.update();
@@ -50,7 +39,7 @@
 //! }
 //!```
 
-/// seperates continuous audio-data to vector of single frequencies
+/// high level and easier to use abstraction over [**fft**](./fft/index.html)
 #[cfg(feature = "spectrum")]
 pub mod spectrum;
 
@@ -104,7 +93,7 @@ mod tests {
         use Distributor;
 
         let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
-        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, 32);
+        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, Some(16));
 
         let mut counter: u128 = 0;
         'distribution: loop {
@@ -117,7 +106,7 @@ mod tests {
                 distributor.push_auto(&buffer);
             }
 
-            let data = distributor.pop_auto();
+            let data = distributor.pop_auto(None);
             let buf_len = distributor.clone_buffer().len();
 
             // if sample rate is fully known with 2 pushes

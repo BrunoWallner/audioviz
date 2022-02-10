@@ -5,7 +5,7 @@ use audioviz::distributor::{Distributor, Elapsed};
 use std::time::Instant;
 
 const SAMPLE_RATE: u64 = 44_100; // in hz
-const BUFFER_DURATION: u64 = 90000; // in µs
+const BUFFER_DURATION: u64 = 100000; // in µs
 
 #[macroquad::main("AudioScope")]
 async fn main() {
@@ -16,7 +16,7 @@ async fn main() {
     let audio_capture = Capture::init(config).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
-    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, 5000);
+    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
 
     let mut buffer: Vec<f32> = Vec::new();
 
@@ -31,7 +31,7 @@ async fn main() {
             delta_push = Instant::now();
         }
         let elapsed = delta_pop.elapsed().as_micros();
-        let mut data = distributor.pop(Elapsed::Micros(elapsed));
+        let mut data = distributor.pop(Elapsed::Micros(elapsed), None);
         delta_pop = Instant::now();
         buffer.append(&mut data);
 

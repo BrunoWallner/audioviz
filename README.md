@@ -15,7 +15,7 @@
 ## Rust features
 | feature | description |
 |---------|-------------|
-| `cpal`  | capturing of systemd audio |
+| `cpal`  | capturing of system audio using [CPAL](https://github.com/RustAudio/cpal)  |
 | `serde` | implementation of Serialize and Deserialize traits |
 | `distributor` | helper for choppy audio-data stream smoothing |
 | `spectrum` | spectrum visualisation module |
