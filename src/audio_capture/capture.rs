@@ -12,7 +12,6 @@ use std::sync::mpsc;
 use std::thread;
 use log::warn;
 
-use crate::audio_capture::config::Config;
 use super::converter;
 
 #[derive(Clone, Debug)]
@@ -46,15 +45,16 @@ impl CaptureReceiver {
 }
 
 pub struct Capture {
+    pub channel_count: u16,
     // will receive data in constant intervall from distributor
     sender: mpsc::Sender<CaptureEvent>,
     _stream: cpal::Stream,
 }
 impl Capture {
-    pub fn init(config: Config) -> Result<Self, Error> {
+    pub fn init(device: &str) -> Result<Self, Error> {
         let (sender, receiver) = mpsc::channel();
 
-        let stream = match stream_audio_to_distributor(sender.clone(), config.clone()) {
+        let (channel_count, stream) = match stream_audio_to_distributor(sender.clone(), device) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -65,6 +65,7 @@ impl Capture {
         });
 
         Ok(Self {
+            channel_count,
             sender,
             _stream: stream,
         })
@@ -128,11 +129,11 @@ fn handle_events(
 
 fn stream_audio_to_distributor(
     sender: mpsc::Sender<CaptureEvent>,
-    config: Config,
-) -> Result<cpal::Stream, Error> {
+    device: &str,
+) -> Result<(u16, cpal::Stream), Error> {
     let host = cpal::default_host();
 
-    let device = match config.device.as_str() {
+    let device = match device {
         "default" => match host.default_input_device() {
             Some(d) => d,
             None => return Err(Error::DeviceNotFound),
@@ -148,39 +149,22 @@ fn stream_audio_to_distributor(
         },
     };
 
-    let device_config = cpal::StreamConfig {
-        channels: 1,
-        sample_rate: match config.sample_rate {
-            Some(rate) => cpal::SampleRate(rate),
-            None => cpal::SampleRate(44_100),
-        },
-        buffer_size: match config.latency {
-            Some(latency) => cpal::BufferSize::Fixed(latency),
-            None => cpal::BufferSize::Default,
-        },
-    };
-
-    let sample_format: cpal::SampleFormat = match device.default_input_config() {
-        Ok(c) => c.sample_format(),
+    let config: cpal::SupportedStreamConfig = match device.default_input_config() {
+        Ok(c) => c,
         Err(_) => return Err(Error::DeviceNotAvailable)
     };
 
-    /*
-    match device.build_input_stream(
-        &device_config,
-        move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
-        |_| (),
-    */
+    let channel_count = config.channels();
 
     #[allow(unused_must_use)]
-    let stream = match sample_format {
+    let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
-            &device_config.into(),
+            &config.into(),
             move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
         cpal::SampleFormat::I16 => device.build_input_stream(
-            &device_config.into(),
+            &config.into(),
             move |data: &[i16], _: &_| { 
                 let data = converter::i16_to_f32(data);
                 sender.send(CaptureEvent::SendData(data.to_vec())); 
@@ -188,7 +172,7 @@ fn stream_audio_to_distributor(
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
         cpal::SampleFormat::U16 => device.build_input_stream(
-            &device_config.into(),
+            &config.into(),
             move |data: &[u16], _: &_| { 
                 let data = converter::u16_to_f32(data);
                 sender.send(CaptureEvent::SendData(data.to_vec())); 
@@ -214,5 +198,5 @@ fn stream_audio_to_distributor(
 
     stream.play().unwrap();
 
-    Ok(stream)
+    Ok( (channel_count, stream) )
 }

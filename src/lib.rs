@@ -9,13 +9,13 @@
 //!
 //!# Code Example with spectrum
 //!```
-//! use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
+//! use audioviz::audio_capture::capture::Capture;
 //! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 //! use audioviz::distributor::Distributor;
 //!
 //! fn main() {
 //!     // captures audio from system using cpal
-//!     let audio_capture = Capture::init(CaptureConfig::default()).unwrap();
+//!     let audio_capture = Capture::init("default").unwrap();
 //!     let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
 //!     // smooths choppy audio data received from audio_receiver
@@ -43,7 +43,6 @@
 #[cfg(feature = "spectrum")]
 pub mod spectrum;
 
-/// captures audio from system using cpal
 #[cfg(feature = "cpal")]
 pub mod audio_capture;
 
@@ -52,6 +51,8 @@ pub mod distributor;
 
 #[cfg(feature = "fft")]
 pub mod fft;
+
+pub mod utils;
 
 #[cfg(test)]
 mod tests {
@@ -79,9 +80,10 @@ mod tests {
             let command = Command::new("cargo")
                 .current_dir(path)
                 .arg("check")
+                .arg("--quiet")
                 .status()
                 .unwrap();
-            assert!(command.success());    
+            assert!(command.success(), "failed at {} example", example);    
         }
     }
 

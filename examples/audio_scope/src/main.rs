@@ -1,38 +1,32 @@
 use macroquad::prelude::*;
 
-use audioviz::audio_capture::{config::Config as CaptureConfig, capture::Capture};
-use audioviz::distributor::{Distributor, Elapsed};
-use std::time::Instant;
+use audioviz::audio_capture::capture::Capture;
+use audioviz::distributor::Distributor;
+use audioviz::utils::seperate_channels;
 
 const SAMPLE_RATE: u64 = 44_100; // in hz
 const BUFFER_DURATION: u64 = 100000; // in µs
 
 #[macroquad::main("AudioScope")]
 async fn main() {
-    let config = CaptureConfig {
-        sample_rate: None,
-        ..Default::default()
-    };
-    let audio_capture = Capture::init(config).unwrap();
+    let audio_capture = Capture::init("default").unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
 
     let mut buffer: Vec<f32> = Vec::new();
 
-    // neccessary for distributor
-    let mut delta_push: Instant = Instant::now();
-    let mut delta_pop: Instant = Instant::now();
-
     loop {
         if let Some(data) = audio_receiver.receive_data() {
-            let elapsed = delta_push.elapsed().as_micros();
-            distributor.push(&data, Elapsed::Micros(elapsed));
-            delta_push = Instant::now();
+            distributor.push_auto(&data);
         }
-        let elapsed = delta_pop.elapsed().as_micros();
-        let mut data = distributor.pop(Elapsed::Micros(elapsed), None);
-        delta_pop = Instant::now();
+        let data = distributor.pop_auto(None);
+        let data = seperate_channels(&data, audio_capture.channel_count as usize);
+        let mut data: Vec<f32> = if !data.is_empty() {
+            data[0].clone()
+        } else {
+            vec![]
+        };
         buffer.append(&mut data);
 
         let wanted_buf_size: u64 = ((1000.0 / SAMPLE_RATE as f32) * BUFFER_DURATION as f32) as u64; 

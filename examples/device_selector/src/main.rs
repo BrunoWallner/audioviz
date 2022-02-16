@@ -1,7 +1,4 @@
-use audioviz::audio_capture::{
-    capture::Capture,
-    config::Config as CaptureConfig
-};
+use audioviz::audio_capture::capture::Capture;
 
 fn main() {
     let devices = Capture::fetch_devices().unwrap();
@@ -21,13 +18,9 @@ fn main() {
     let device = devices[id].clone();
 
     println!("capturing audio from: {}", device);
-    let config = CaptureConfig {
-        device,
-        ..Default::default()
-    };
     
     // must be in scope, otherwise capture will stop
-    let _capture = Capture::init(config).unwrap();
+    let _capture = Capture::init(&device).unwrap();
     loop {}
 }
 

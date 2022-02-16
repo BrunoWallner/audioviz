@@ -20,15 +20,16 @@
 //!     └─────────────────────────┘
 //! ```
 
-use crate::spectrum::config::StreamConfig;
-use crate::spectrum::{processor::Processor, Frequency};
+use super::config::StreamConfig;
+use super::{processor::Processor, Frequency};
+use crate::utils::seperate_channels;
 
 /// abstraction over `processor::Processor` with additional effects like gravity
 pub struct Stream {
     pub config: StreamConfig,
-    raw_buffer: Vec<f32>,
-    freq_buffer: Vec<Frequency>,
-    gravity_time_buffer: Vec<u32>,
+    raw_buffer: Vec<Vec<f32>>,
+    freq_buffer: Vec<Vec<Frequency>>,
+    gravity_time_buffer: Vec<Vec<u32>>,
 }
 impl Stream {
     pub fn new(config: StreamConfig) -> Self {
@@ -40,193 +41,110 @@ impl Stream {
             gravity_time_buffer: Vec::with_capacity(cap),
         }
     }
-    pub fn push_data(&mut self, mut data: Vec<f32>) {
-        self.raw_buffer.append(&mut data);
+    pub fn push_data(&mut self, data: Vec<f32>) {
+        //self.raw_buffer.append(&mut data);
+        let channels: usize = self.config.channel_count as usize;
+        if self.raw_buffer.len() != channels {
+            self.raw_buffer = vec![vec![]; channels];
+        }
+        for (channel, data) in seperate_channels(&data, channels).iter().enumerate() {
+            let mut data = &mut data.clone();
+            self.raw_buffer[channel].append(&mut data);
+        }
     }
-    pub fn get_frequencies(&mut self) -> Vec<Frequency> {
+    pub fn get_frequencies(&mut self) -> Vec<Vec<Frequency>> {
         let data = self.freq_buffer.clone();
 
+        let channels: usize = self.config.channel_count as usize;
+        let mut buffer: Vec<Vec<Frequency>> = Vec::with_capacity(channels);
         // additional effects get applied here, that were skiped on `self.update()`
-        let mut audio_data = Processor::from_frequencies(
-            self.config.clone().processor,
-            data.clone(),
-        );
-        audio_data.bound_frequencies();
-        audio_data.interpolate();
-        
-        audio_data.freq_buffer
+        for channel_data in data.iter() {
+            let mut audio_data = Processor::from_frequencies(
+                self.config.clone().processor,
+                channel_data.clone(),
+            );
+            audio_data.bound_frequencies();
+            audio_data.interpolate();
+            
+            buffer.push(audio_data.freq_buffer)
+        }
+        buffer
     }
     /// calculates frequencies from raw data using FFT algorithm
     /// 
     /// responsible for gravity so it should be called periodicly because I have not yet implemented delta time
     pub fn update(&mut self) {
-        /* Prcesses data using spectralizer::Processor */
-        let fft_res: usize = self.config.fft_resolution;
+        // processes on every channel
+        let channels: usize = self.config.channel_count as usize;
+        for (channel, raw_data) in self.raw_buffer.iter_mut().enumerate() {
+            /* Prcesses data using spectralizer::Processor */
+            let fft_res: usize = self.config.fft_resolution;
 
-        if self.raw_buffer.len() > fft_res {
-            // clears unimportant buffer values that should already be processed
-            // and thus reduce latency
-            let diff = self.raw_buffer.len() - fft_res;
-            self.raw_buffer.drain(..diff);
-
-            let mut audio_data = Processor::from_raw_data(
-                self.config.clone().processor,
-                self.raw_buffer[..].to_vec(),
-            );
-            audio_data.apodize();
-            audio_data.fft();
-            audio_data.normalize_frequency_volume();
-
-            audio_data.raw_to_freq_buffer();
-            audio_data.normalize_frequency_position();
-            audio_data.distribute_frequency_position();
-
-            let processed_buffer = audio_data.freq_buffer;
-
-            match self.config.gravity {
-                Some(gravity) => {
-                    /* applies gravity to buffer */
-                    if self.freq_buffer.len() != processed_buffer.len() {
-                        self.freq_buffer =
-                            vec![Frequency::empty(); processed_buffer.len()];
-                    }
-                    if self.gravity_time_buffer.len() != processed_buffer.len() {
-                        self.gravity_time_buffer = vec![0; processed_buffer.len()];
-                    }
-                    // sets value of gravity_buffer to current_buffer if current_buffer is higher
-                    for i in 0..processed_buffer.len() {
-                        if self.freq_buffer[i].volume < processed_buffer[i].volume {
-                            self.freq_buffer[i] = processed_buffer[i].clone();
-                            self.gravity_time_buffer[i] = 0;
-                        } else {
-                            self.gravity_time_buffer[i] += 1;
+            if raw_data.len() > fft_res {
+                // clears unimportant buffer values that should already be processed
+                // and thus reduce latency
+                let diff = raw_data.len() - fft_res;
+                raw_data.drain(..diff);
+    
+                let mut audio_data = Processor::from_raw_data(
+                    self.config.clone().processor,
+                    raw_data[..].to_vec(),
+                );
+                audio_data.apodize();
+                audio_data.fft();
+                audio_data.normalize_frequency_volume();
+    
+                audio_data.raw_to_freq_buffer();
+                audio_data.normalize_frequency_position();
+                audio_data.distribute_frequency_position();
+    
+                let processed_buffer = audio_data.freq_buffer;
+    
+                match self.config.gravity {
+                    Some(gravity) => {
+                        /* applies gravity to buffer */
+                        // freq_buffer allocation size check
+                        if self.freq_buffer.len() != channels {
+                            self.freq_buffer = vec![vec![Frequency::empty()]; channels];
                         }
-                    }
-
-                    // apply gravity to buffer
-                    for (i, freq) in self.freq_buffer.iter_mut().enumerate() {
-                        let gravity: f32 = gravity * 0.0025 * (self.gravity_time_buffer[i] as f32);
-                        if freq.volume - gravity >= 0.0 {
-                            freq.volume -= gravity;
-                        } else {
-                            freq.volume = 0.0;
-                            self.gravity_time_buffer[i] = 0;
+                        if self.freq_buffer[channel].len() != processed_buffer.len() {
+                            self.freq_buffer[channel] = vec![Frequency::empty(); processed_buffer.len()];
                         }
-                    }
-                }
-                None => {
-                    /* skips gravity */
-                    self.freq_buffer = processed_buffer;
-                }
-            }
-        }
-    }
-    /*
-    pub fn init(config: StreamConfig) -> Self {
-        loop {
-            if let Ok(event) = event_receiver.recv() {
-                match event {
-                    Event::RequestData(sender) => {
-                        let mut audio_data = Processor::from_frequencies(
-                            config.clone().processor,
-                            freq_buffer.clone(),
-                        );
-                        audio_data.bound_frequencies();
-                        audio_data.interpolate();
 
-                        sender.send(audio_data.freq_buffer).ok();
-                    }
-                    Event::SendData(mut data) => {
-                        raw_buffer.append(&mut data);
-                    }
-                    Event::RequestConfig(sender) => {
-                        sender.send(config.clone()).ok();
-                    }
-                    Event::SendConfig(conf) => {
-                        config = conf;
-                    }
-                    Event::RequestRefresh => {
-                        /* Prcesses data using spectralizer::Processor */
-                        let fft_res: usize = config.fft_resolution;
-
-                        if raw_buffer.len() > fft_res {
-                            // clears unimportant buffer values that should already be processed
-                            // and thus reduce latency
-                            let diff = raw_buffer.len() - fft_res;
-                            raw_buffer.drain(..diff);
-
-                            let mut audio_data = Processor::from_raw_data(
-                                config.clone().processor,
-                                raw_buffer[..].to_vec(),
-                            );
-                            audio_data.apodize();
-                            audio_data.fft();
-                            audio_data.normalize_frequency_volume();
-
-                            audio_data.raw_to_freq_buffer();
-                            audio_data.normalize_frequency_position();
-                            audio_data.distribute_frequency_position();
-
-                            let processed_buffer = audio_data.freq_buffer;
-
-                            match config.gravity {
-                                Some(gravity) => {
-                                    /* applies gravity to buffer */
-                                    if freq_buffer.len() != processed_buffer.len() {
-                                        freq_buffer =
-                                            vec![Frequency::empty(); processed_buffer.len()];
-                                    }
-                                    if gravity_time_buffer.len() != processed_buffer.len() {
-                                        gravity_time_buffer = vec![0; processed_buffer.len()];
-                                    }
-                                    // sets value of gravity_buffer to current_buffer if current_buffer is higher
-                                    for i in 0..processed_buffer.len() {
-                                        if freq_buffer[i].volume < processed_buffer[i].volume {
-                                            freq_buffer[i] = processed_buffer[i].clone();
-                                            gravity_time_buffer[i] = 0;
-                                        } else {
-                                            gravity_time_buffer[i] += 1;
-                                        }
-                                    }
-
-                                    // apply gravity to buffer
-                                    for (i, freq) in freq_buffer.iter_mut().enumerate() {
-                                        let gravity: f32 = gravity * 0.0025 * (gravity_time_buffer[i] as f32);
-                                        println!("{}", gravity);
-                                        if freq.volume - gravity >= 0.0 {
-                                            freq.volume -= gravity;
-                                        } else {
-                                            freq.volume = 0.0;
-                                            gravity_time_buffer[i] = 0;
-                                        }
-                                    }
-                                }
-                                None => {
-                                    /* skips gravity */
-                                    freq_buffer = processed_buffer;
-                                }
+                        // gravity time allocation size check
+                        if self.gravity_time_buffer.len() != channels {
+                            self.gravity_time_buffer = vec![vec![0]; channels];
+                        }
+                        if self.gravity_time_buffer[channel].len() != processed_buffer.len() {
+                            self.gravity_time_buffer[channel] = vec![0; processed_buffer.len()];
+                        }
+                        // sets value of gravity_buffer to current_buffer if current_buffer is higher
+                        for i in 0..processed_buffer.len() {
+                            if self.freq_buffer[channel][i].volume < processed_buffer[i].volume {
+                                self.freq_buffer[channel][i] = processed_buffer[i].clone();
+                                self.gravity_time_buffer[channel][i] = 0;
+                            } else {
+                                self.gravity_time_buffer[channel][i] += 1;
                             }
                         }
-                    } // end of submatch
+    
+                        // apply gravity to buffer
+                        for (i, freq) in self.freq_buffer[channel].iter_mut().enumerate() {
+                            let gravity: f32 = gravity * 0.0025 * (self.gravity_time_buffer[channel][i] as f32);
+                            if freq.volume - gravity >= 0.0 {
+                                freq.volume -= gravity;
+                            } else {
+                                freq.volume = 0.0;
+                                self.gravity_time_buffer[channel][i] = 0;
+                            }
+                        }
+                    }
+                    None => {
+                        /* skips gravity */
+                        self.freq_buffer[channel] = processed_buffer;
+                    }
                 }
             }
         }
-
-        // refresh requester
-        let event_sender_clone = event_sender.clone();
-        thread::spawn(move || loop {
-            // receiving refresh rate from main thread
-            let (tx, rx) = mpsc::channel();
-            event_sender_clone.send(Event::RequestConfig(tx)).unwrap();
-            let config = rx.recv().unwrap();
-
-            thread::sleep(std::time::Duration::from_millis(
-                1000 / config.refresh_rate as u64,
-            ));
-            event_sender_clone.send(Event::RequestRefresh).unwrap();
-        });
-
-        Stream { event_sender }
     }
-    */
 }

@@ -133,6 +133,7 @@ impl Default for ProcessorConfig {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StreamConfig {
+    pub channel_count: u16,
     pub processor: ProcessorConfig,
 
     /// with higher resolution comes better precision, that is mostly needed for lower frequencies
@@ -147,6 +148,7 @@ pub struct StreamConfig {
 impl Default for StreamConfig {
     fn default() -> Self {
         StreamConfig {
+            channel_count: 2,
             processor: ProcessorConfig::default(),
             fft_resolution: 1024 * 2,
             refresh_rate: 60,
