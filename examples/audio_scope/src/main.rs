@@ -1,14 +1,25 @@
 use macroquad::prelude::*;
 
-use audioviz::audio_capture::capture::Capture;
+use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::distributor::Distributor;
 use audioviz::utils::{seperate_channels, apodize};
+
+use std::io::Write;
 
 const BUFFER_LENGTH: usize = 1024;
 
 #[macroquad::main("AudioScope")]
 async fn main() {
-    let audio_capture = Capture::init("default").unwrap();
+    let mut audio_capture = Capture::new();
+
+    // device selection
+    let devices = audio_capture.fetch_devices().unwrap();
+    for (id, device) in devices.iter().enumerate() {
+        println!("{id}\t{device}");
+    }
+    let id: usize = input("id: ").parse().unwrap_or(0);
+
+    audio_capture.init(&Device::Id(id)).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
@@ -20,7 +31,7 @@ async fn main() {
             distributor.push_auto(&data);
         }
         let data = distributor.pop_auto(None);
-        let data = seperate_channels(&data, audio_capture.channel_count as usize);
+        let data = seperate_channels(&data, audio_capture.channel_count.unwrap() as usize);
         let mut data: Vec<f32> = if !data.is_empty() {
             data[0].clone()
         } else {
@@ -70,3 +81,16 @@ async fn main() {
         next_frame().await
     }
 }
+
+fn input(print: &str) -> String {
+    print!("{}", print);
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+
+    std::io::stdin().read_line(&mut input)
+        .ok()
+        .expect("Couldn't read line");
+        
+    input.trim().to_string()
+}
+

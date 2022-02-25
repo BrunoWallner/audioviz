@@ -1,16 +1,16 @@
 //! Captures audio from system
-//! 
+//!
 //! then sends the data to the distributor which distributes one big buffer into multiple smaller ones
-//! 
+//!
 //! this increases overall smoothness at the cost of increased latency
-//! 
+//!
 //! On linux it can happen, that alsa prints to stderr
 //! for this I recommend to use `https://github.com/Stebalien/gag-rs`
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use log::warn;
 use std::sync::mpsc;
 use std::thread;
-use log::warn;
 
 use super::converter;
 
@@ -27,8 +27,16 @@ enum CaptureEvent {
     SendData(Vec<f32>),
     ReceiveData(mpsc::Sender<Option<Vec<f32>>>),
 }
+
+#[derive(Clone, Debug)]
+pub enum Device {
+    DefaultInput,
+    DefaultOutput,
+    Id(usize),
+}
+
 pub struct CaptureReceiver {
-    sender: mpsc::Sender<CaptureEvent>
+    sender: mpsc::Sender<CaptureEvent>,
 }
 impl CaptureReceiver {
     #[allow(unused_must_use)]
@@ -36,25 +44,34 @@ impl CaptureReceiver {
         let (sender, receiver) = mpsc::channel();
         self.sender.send(CaptureEvent::ReceiveData(sender));
         match receiver.recv() {
-            Ok(val) => {
-                val
-            }
-            Err(_) => None
+            Ok(val) => val,
+            Err(_) => None,
         }
     }
 }
 
 pub struct Capture {
-    pub channel_count: u16,
+    pub channel_count: Option<u16>,
+    host: cpal::platform::Host,
     // will receive data in constant intervall from distributor
-    sender: mpsc::Sender<CaptureEvent>,
-    _stream: cpal::Stream,
+    sender: Option<mpsc::Sender<CaptureEvent>>,
+    stream: Option<cpal::Stream>,
 }
 impl Capture {
-    pub fn init(device: &str) -> Result<Self, Error> {
+    pub fn new() -> Self{
+        let host = cpal::default_host();
+
+        return Self {
+            channel_count: None,
+            host,
+            sender: None,
+            stream: None,
+        }
+    }
+    pub fn init(&mut self, device: &Device) -> Result<(), Error> {
         let (sender, receiver) = mpsc::channel();
 
-        let (channel_count, stream) = match stream_audio_to_distributor(sender.clone(), device) {
+        let (channel_count, stream) = match stream_audio_to_distributor(&self.host, sender.clone(), device) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -64,47 +81,46 @@ impl Capture {
             handle_events(receiver);
         });
 
-        Ok(Self {
-            channel_count,
-            sender,
-            _stream: stream,
-        })
+        self.channel_count = Some(channel_count);
+        self.stream = Some(stream);
+        self.sender = Some(sender);
+
+        Ok(())
     }
 
     /// request a receiver that receives the distributed audio data as f32 samples
-    /// 
+    ///
     /// you can request multiple receivers out of one Capture
     #[allow(unused_must_use)]
-    pub fn get_receiver(&self) -> Result<CaptureReceiver, ()> {
-        let sender = self.sender.clone();
-        Ok(CaptureReceiver{sender})
+    pub fn get_receiver(&self) -> Option<CaptureReceiver> {
+        if let Some(sender) = self.sender.clone() {
+            Some(CaptureReceiver {sender})
+        } else {
+            None
+        }
     }
 
-    pub fn fetch_devices() -> Result<Vec<String>, Error> {
-        let host = cpal::default_host();
-        let devices = match host.devices() {
+    pub fn fetch_devices(&self) -> Result<Vec<String>, Error> {
+        let devices = match self.host.devices() {
             Ok(d) => d,
             Err(e) => match e {
                 cpal::DevicesError::BackendSpecific { err } => {
                     let cpal::BackendSpecificError { description } = err;
-                    return Err(Error::BackendSpecific(description))
+                    return Err(Error::BackendSpecific(description));
                 }
-            }
+            },
         };
-        let devices: Vec<String> = devices.into_iter()
-        .map(
-            |dev| dev.name().unwrap_or_else(|_| String::from("invalid")
-        ))
-        .collect();
+        let devices: Vec<String> = devices
+            .into_iter()
+            .map(|dev| dev.name().unwrap_or_else(|_| String::from("invalid")))
+            .collect();
 
         Ok(devices)
     }
 }
 
 #[allow(unused_must_use)]
-fn handle_events(
-    receiver: mpsc::Receiver<CaptureEvent>,
-) {
+fn handle_events(receiver: mpsc::Receiver<CaptureEvent>) {
     let mut data: Vec<f32> = Vec::new();
 
     loop {
@@ -114,13 +130,13 @@ fn handle_events(
                     data.append(&mut d);
                 }
                 CaptureEvent::ReceiveData(sender) => {
-                   //sender.send(data.clone());
+                    //sender.send(data.clone());
                     if !data.is_empty() {
                         sender.send(Some(data.clone()));
                     } else {
                         sender.send(None);
                     }
-                   data.drain(..); 
+                    data.drain(..);
                 }
             }
         }
@@ -128,30 +144,31 @@ fn handle_events(
 }
 
 fn stream_audio_to_distributor(
+    host: &cpal::platform::Host,
     sender: mpsc::Sender<CaptureEvent>,
-    device: &str,
+    device: &Device,
 ) -> Result<(u16, cpal::Stream), Error> {
-    let host = cpal::default_host();
-
     let device = match device {
-        "default" => match host.default_input_device() {
+        &Device::DefaultInput => match host.default_input_device() {
             Some(d) => d,
             None => return Err(Error::DeviceNotFound),
         },
-        device => match host.input_devices() {
-            Ok(mut devices) => {
-                match devices.find(|x| x.name().map(|y| y == *device).unwrap_or(false)) {
-                    Some(d) => d,
-                    None => return Err(Error::DeviceNotFound),
-                }
-            }
+        &Device::DefaultOutput => match host.default_output_device() {
+            Some(d) => d,
+            None => return Err(Error::DeviceNotFound),
+        },
+        &Device::Id(id) => match host.input_devices() {
+            Ok(mut devices) => match devices.nth(id) {
+                Some(d) => d,
+                None => return Err(Error::DeviceNotFound),
+            },
             Err(_) => return Err(Error::DeviceNotFound),
         },
     };
 
     let config: cpal::SupportedStreamConfig = match device.default_input_config() {
         Ok(c) => c,
-        Err(_) => return Err(Error::DeviceNotAvailable)
+        Err(_) => return Err(Error::DeviceNotAvailable),
     };
 
     let channel_count = config.channels();
@@ -160,26 +177,27 @@ fn stream_audio_to_distributor(
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data: &[f32], _: &_| { sender.send(CaptureEvent::SendData(data.to_vec())); },
+            move |data: &[f32], _: &_| {
+                sender.send(CaptureEvent::SendData(data.to_vec()));
+            },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
         cpal::SampleFormat::I16 => device.build_input_stream(
             &config.into(),
-            move |data: &[i16], _: &_| { 
+            move |data: &[i16], _: &_| {
                 let data = converter::i16_to_f32(data);
-                sender.send(CaptureEvent::SendData(data.to_vec())); 
+                sender.send(CaptureEvent::SendData(data.to_vec()));
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
         cpal::SampleFormat::U16 => device.build_input_stream(
             &config.into(),
-            move |data: &[u16], _: &_| { 
+            move |data: &[u16], _: &_| {
                 let data = converter::u16_to_f32(data);
-                sender.send(CaptureEvent::SendData(data.to_vec())); 
+                sender.send(CaptureEvent::SendData(data.to_vec()));
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
-
     };
 
     let stream = match stream {
@@ -198,5 +216,5 @@ fn stream_audio_to_distributor(
 
     stream.play().unwrap();
 
-    Ok( (channel_count, stream) )
+    Ok((channel_count, stream))
 }

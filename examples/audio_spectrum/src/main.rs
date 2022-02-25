@@ -1,16 +1,28 @@
 use macroquad::prelude::*;
 
-use audioviz::audio_capture::capture::Capture;
+use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 use audioviz::distributor::Distributor;
 
+use std::io::Write;
+
 #[macroquad::main("AudioSpectrum")]
 async fn main() {
-    let audio_capture = Capture::init("default").unwrap();
+    let mut audio_capture = Capture::new();
+
+    // device selection
+    let devices = audio_capture.fetch_devices().unwrap();
+    for (id, device) in devices.iter().enumerate() {
+        println!("{id}\t{device}");
+    }
+    let id: usize = input("id: ").parse().unwrap_or(0);
+
+    audio_capture.init(&Device::Id(id)).unwrap();
     let audio_receiver = audio_capture.get_receiver().unwrap();
 
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
     let stream_config: StreamConfig = StreamConfig {
+        channel_count: audio_capture.channel_count.unwrap(),
         gravity: Some(6.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
@@ -79,4 +91,16 @@ async fn main() {
 
         next_frame().await
     }
+}
+
+fn input(print: &str) -> String {
+    print!("{}", print);
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+
+    std::io::stdin().read_line(&mut input)
+        .ok()
+        .expect("Couldn't read line");
+        
+    input.trim().to_string()
 }

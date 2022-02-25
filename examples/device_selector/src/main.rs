@@ -1,7 +1,8 @@
-use audioviz::audio_capture::capture::Capture;
+use audioviz::audio_capture::capture::{Capture, Device};
 
 fn main() {
-    let devices = Capture::fetch_devices().unwrap();
+    let mut audio_capture = Capture::new();
+    let devices = audio_capture.fetch_devices().unwrap();
     println!("ID       Device");
     println!("------------------");
     for (i, dev) in devices.iter().enumerate() {
@@ -16,11 +17,10 @@ fn main() {
         }
     };
     let device = devices[id].clone();
-
     println!("capturing audio from: {}", device);
     
     // must be in scope, otherwise capture will stop
-    let _capture = Capture::init(&device).unwrap();
+    let _capture = audio_capture.init(&Device::Id(id)).unwrap();
     loop {}
 }
 

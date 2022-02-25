@@ -9,13 +9,14 @@
 //!
 //!# Code Example with spectrum
 //!```
-//! use audioviz::audio_capture::capture::Capture;
+//! use audioviz::audio_capture::capture::{Capture, Device};
 //! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 //! use audioviz::distributor::Distributor;
 //!
 //! fn main() {
 //!     // captures audio from system using cpal
-//!     let audio_capture = Capture::init("default").unwrap();
+//!     let mut audio_capture = Capture::new();
+//!     audio_capture.init(&Device::DefaultInput).unwrap();
 //!     let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
 //!     // smooths choppy audio data received from audio_receiver
