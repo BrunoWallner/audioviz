@@ -24,7 +24,7 @@ use splines::{Interpolation, Key, Spline};
 
 use crate::spectrum::config::Interpolation as ConfigInterpolation;
 use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation, PositionNormalisation};
-use crate::fft;
+use crate::{fft, utils::apodize};
 
 use crate::spectrum::Frequency;
 
@@ -71,10 +71,7 @@ impl Processor {
     /// 
     /// this removes noise
     pub fn apodize(&mut self) {
-        let window = apodize::hanning_iter(self.raw_buffer.len()).collect::<Vec<f64>>();
-        for (i, value) in self.raw_buffer.iter_mut().enumerate() {
-            *value *= window[i] as f32;
-        }
+        apodize(&mut self.raw_buffer)
     }
 
     /// processes fft algorithm on `raw_buffer`

@@ -12,3 +12,11 @@ pub fn seperate_channels(data: &[f32], channel_count: usize) -> Vec<Vec<f32>> {
 
     buffer
 }
+
+#[cfg(feature = "apodize")]
+pub fn apodize(data: &mut Vec<f32>) {
+    let window = apodize::hanning_iter(data.len()).collect::<Vec<f64>>();
+    for (i, value) in data.iter_mut().enumerate() {
+        *value *= window[i] as f32;
+    }
+}

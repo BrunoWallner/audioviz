@@ -100,24 +100,25 @@ impl Stream {
     
                 let processed_buffer = audio_data.freq_buffer;
     
+                // freq_buffer allocation size check
+                if self.freq_buffer.len() != channels {
+                    self.freq_buffer = vec![vec![Frequency::empty()]; channels];
+                }
+                if self.freq_buffer[channel].len() != processed_buffer.len() {
+                    self.freq_buffer[channel] = vec![Frequency::empty(); processed_buffer.len()];
+                }
+
+                // gravity time allocation size check
+                if self.gravity_time_buffer.len() != channels {
+                    self.gravity_time_buffer = vec![vec![0]; channels];
+                }
+                if self.gravity_time_buffer[channel].len() != processed_buffer.len() {
+                    self.gravity_time_buffer[channel] = vec![0; processed_buffer.len()];
+                }
+
                 match self.config.gravity {
                     Some(gravity) => {
                         /* applies gravity to buffer */
-                        // freq_buffer allocation size check
-                        if self.freq_buffer.len() != channels {
-                            self.freq_buffer = vec![vec![Frequency::empty()]; channels];
-                        }
-                        if self.freq_buffer[channel].len() != processed_buffer.len() {
-                            self.freq_buffer[channel] = vec![Frequency::empty(); processed_buffer.len()];
-                        }
-
-                        // gravity time allocation size check
-                        if self.gravity_time_buffer.len() != channels {
-                            self.gravity_time_buffer = vec![vec![0]; channels];
-                        }
-                        if self.gravity_time_buffer[channel].len() != processed_buffer.len() {
-                            self.gravity_time_buffer[channel] = vec![0; processed_buffer.len()];
-                        }
                         // sets value of gravity_buffer to current_buffer if current_buffer is higher
                         for i in 0..processed_buffer.len() {
                             if self.freq_buffer[channel][i].volume < processed_buffer[i].volume {
