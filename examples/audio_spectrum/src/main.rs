@@ -4,7 +4,11 @@ use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 use audioviz::distributor::Distributor;
 
+use audioviz::processor::{Processor, Plugin};
+
 use std::io::Write;
+
+const LOWPASS: bool = false;
 
 #[macroquad::main("AudioSpectrum")]
 async fn main() {
@@ -38,14 +42,30 @@ async fn main() {
         if let Some(data) = audio_receiver.receive_data() {
             distributor.push_auto(&data);
         }
-        let data = distributor.pop_auto(None);
-        stream.push_data(data);
+        let mut data = distributor.pop_auto(None);
 
-        stream.update();
+        if !data.is_empty() {
+            // lowpass-filter
+            if LOWPASS {
+                let mut processor = Processor {
+                    data: data,
+                    sampling_rate: audio_capture.sampling_rate.unwrap_or(0) as f32,
+                    plugins: vec![
+                        Plugin::Lowpass{cutoff_frequency: 100.0}
+                    ],
+                };
+                processor.process();
+                data = processor.data;
+            }
+            stream.push_data(data);
+
+            stream.update();
+        }
         
         let frequencies: Vec<Vec<Frequency>> = stream.get_frequencies();
         let frequencies: Vec<Frequency> = if frequencies.len() >= 2 {
             let mut buf: Vec<Frequency> = Vec::new();
+
             // left
             let mut left = frequencies[0].clone();
             left.reverse();
@@ -56,7 +76,11 @@ async fn main() {
 
             buf
         } else {
-            vec![Frequency::empty()]
+            if frequencies.len() == 1 {
+                frequencies[0].clone()
+            } else {
+                Vec::new()
+            }
         };
 
         clear_background(BLACK);
