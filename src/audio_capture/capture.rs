@@ -52,6 +52,7 @@ impl CaptureReceiver {
 
 pub struct Capture {
     pub channel_count: Option<u16>,
+    pub sampling_rate: Option<u32>,
     host: cpal::platform::Host,
     // will receive data in constant intervall from distributor
     sender: Option<mpsc::Sender<CaptureEvent>>,
@@ -62,6 +63,7 @@ impl Capture {
         let host = cpal::default_host();
 
         return Self {
+            sampling_rate: None,
             channel_count: None,
             host,
             sender: None,
@@ -71,7 +73,7 @@ impl Capture {
     pub fn init(&mut self, device: &Device) -> Result<(), Error> {
         let (sender, receiver) = mpsc::channel();
 
-        let (channel_count, stream) = match stream_audio_to_distributor(&self.host, sender.clone(), device) {
+        let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, sender.clone(), device) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -81,6 +83,7 @@ impl Capture {
             handle_events(receiver);
         });
 
+        self.sampling_rate = Some(sampling_rate);
         self.channel_count = Some(channel_count);
         self.stream = Some(stream);
         self.sender = Some(sender);
@@ -147,7 +150,8 @@ fn stream_audio_to_distributor(
     host: &cpal::platform::Host,
     sender: mpsc::Sender<CaptureEvent>,
     device: &Device,
-) -> Result<(u16, cpal::Stream), Error> {
+    // returns channel-count, stream and sampling-rate
+) -> Result<(u16, cpal::Stream, u32), Error> {
     let device = match device {
         &Device::DefaultInput => match host.default_input_device() {
             Some(d) => d,
@@ -172,6 +176,7 @@ fn stream_audio_to_distributor(
     };
 
     let channel_count = config.channels();
+    let sampling_rate = config.sample_rate();
 
     #[allow(unused_must_use)]
     let stream = match config.sample_format() {
@@ -216,5 +221,5 @@ fn stream_audio_to_distributor(
 
     stream.play().unwrap();
 
-    Ok((channel_count, stream))
+    Ok((channel_count, stream, sampling_rate.0))
 }

@@ -48,8 +48,8 @@ impl Stream {
             self.raw_buffer = vec![vec![]; channels];
         }
         for (channel, data) in seperate_channels(&data, channels).iter().enumerate() {
-            let mut data = &mut data.clone();
-            self.raw_buffer[channel].append(&mut data);
+            let data = &mut data.clone();
+            self.raw_buffer[channel].append(data);
         }
     }
     pub fn get_frequencies(&mut self) -> Vec<Vec<Frequency>> {

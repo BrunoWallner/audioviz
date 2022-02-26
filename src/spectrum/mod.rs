@@ -14,7 +14,7 @@ pub mod stream;
 pub struct Frequency {
     pub volume: f32,
 
-    /// Actual frequency in hz, can range from 0 to `config.sample_rate` / 2
+    /// Actual frequency in hz, can range from 0 to `config.sampling_rate` / 2
     ///
     /// Accuracy can vary and is not guaranteed
     pub freq: f32,

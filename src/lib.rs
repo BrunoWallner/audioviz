@@ -13,30 +13,28 @@
 //! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 //! use audioviz::distributor::Distributor;
 //!
-//! fn main() {
-//!     // captures audio from system using cpal
-//!     let mut audio_capture = Capture::new();
-//!     audio_capture.init(&Device::DefaultInput).unwrap();
-//!     let audio_receiver = audio_capture.get_receiver().unwrap();
+//! // captures audio from system using cpal
+//! let mut audio_capture = Capture::new();
+//! audio_capture.init(&Device::DefaultInput).unwrap();
+//! let audio_receiver = audio_capture.get_receiver().unwrap();
 //!
-//!     // smooths choppy audio data received from audio_receiver
-//!     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(8128));
+//! // smooths choppy audio data received from audio_receiver
+//! let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(8128));
 //!
-//!     // spectrum visualizer stream
-//!     let mut stream: Stream = Stream::new(StreamConfig::default()); 
-//!     loop {
-//!         if let Some(data) = audio_receiver.receive_data() {
-//!             distributor.push_auto(&data);
-//!         }
-//!         let data = distributor.pop_auto(None);
-//!         stream.push_data(data);
-//! 
-//!         stream.update();
-//!  
-//!         let frequencies = stream.get_frequencies();
-//! 
-//!         break; // otherwise unittest wont return
+//! // spectrum visualizer stream
+//! let mut stream: Stream = Stream::new(StreamConfig::default()); 
+//! loop {
+//!     if let Some(data) = audio_receiver.receive_data() {
+//!         distributor.push_auto(&data);
 //!     }
+//!     let data = distributor.pop_auto(None);
+//!     stream.push_data(data);
+//!
+//!     stream.update();
+//!
+//!     let frequencies = stream.get_frequencies();
+//!
+//!     break; // otherwise unittest wont return
 //! }
 //!```
 
@@ -49,6 +47,9 @@ pub mod audio_capture;
 
 #[cfg(feature = "distributor")]
 pub mod distributor;
+
+#[cfg(feature = "processor")]
+pub mod processor;
 
 #[cfg(feature = "fft")]
 pub mod fft;

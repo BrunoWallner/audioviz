@@ -81,8 +81,8 @@ pub enum Interpolation {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProcessorConfig {
-    /// neccessary so that the Audiostream knows what the hightest frequency is. (`sample_rate` / 2)
-    pub sample_rate: u32,
+    /// neccessary so that the Audiostream knows what the hightest frequency is. (`sampling_rate` / 2)
+    pub sampling_rate: u32,
 
     /// range of frequencies
     pub frequency_bounds: [usize; 2],
@@ -118,7 +118,7 @@ pub struct ProcessorConfig {
 impl Default for ProcessorConfig {
     fn default() -> Self {
         ProcessorConfig {
-            sample_rate: 44_100,
+            sampling_rate: 44_100,
             frequency_bounds: [50, 20000],
             resolution: None,
             volume: 1.0,

@@ -4,9 +4,12 @@ use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::distributor::Distributor;
 use audioviz::utils::{seperate_channels, apodize};
 
+use audioviz::processor::{Processor, Plugin};
+
 use std::io::Write;
 
 const BUFFER_LENGTH: usize = 1024;
+const LOWPASS: bool = true;
 
 #[macroquad::main("AudioScope")]
 async fn main() {
@@ -52,6 +55,20 @@ async fn main() {
         let width = screen_width();
 
         if !buffer.is_empty() {
+            // lowpass-filter
+            if LOWPASS {
+                let mut processor = Processor {
+                    data: buffer.to_vec(),
+                    sampling_rate: audio_capture.sampling_rate.unwrap_or(0) as f32,
+                    plugins: vec![
+                        Plugin::Lowpass{cutoff_frequency: 100.0}
+                    ],
+                };
+                processor.process();
+                buffer = processor.data;
+            }
+
+            // apdize
             let mut apodized_buffer = buffer.clone();
             apodize(&mut apodized_buffer);
     

@@ -4,20 +4,18 @@
 //! use audioviz::spectrum::processor::Processor;
 //! use audioviz::spectrum::Frequency;
 //! 
-//! fn main() {
-//!     // sample rate must be known and only one channel processing is supported
-//!     let data = vec![0.0, 1.0, 0.0, 0.5, -1.0, 0.043];
+//! // sample rate must be known and only one channel processing is supported
+//! let data = vec![0.0, 1.0, 0.0, 0.5, -1.0, 0.043];
 //! 
-//!     let mut processor = Processor::from_raw_data(
-//!         ProcessorConfig::default(), // make sure that sample_rate is correct, default is 44_100hz
-//!         data
-//!     );
-//!     processor.compute_all();
+//! let mut processor = Processor::from_raw_data(
+//!     ProcessorConfig::default(), // make sure that sampling_rate is correct, default is 44_100hz
+//!     data
+//! );
+//! processor.compute_all();
 //! 
-//!     let frequencies: Vec<Frequency> = processor.freq_buffer;
+//! let frequencies: Vec<Frequency> = processor.freq_buffer;
 //! 
-//!     println!("{:#?}", frequencies);
-//! }
+//! println!("{:#?}", frequencies);
 //! ```
 
 use splines::{Interpolation, Key, Spline};
@@ -116,7 +114,7 @@ impl Processor {
             let mut pointer_pos: f32 = 0.0;
             for (i, val) in self.freq_buffer.iter_mut().enumerate() {
                 let percentage: f32 = (i + 1) as f32 / freq_buf_len as f32;
-                let freq: f32 = percentage * (self.config.sample_rate as f32 / 2.0);
+                let freq: f32 = percentage * (self.config.sampling_rate as f32 / 2.0);
                 let offset = dis_spline.clamped_sample(freq).unwrap_or(1.0);
 
                 let diff = val.position - last_position;
@@ -154,7 +152,7 @@ impl Processor {
             self.freq_buffer.push(Frequency {
                 volume: *val * self.config.volume,
                 position: percentage,
-                freq: percentage * (self.config.sample_rate as f32 / 2.0),
+                freq: percentage * (self.config.sampling_rate as f32 / 2.0),
             });
         }
     }
