@@ -4,12 +4,12 @@ use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::distributor::Distributor;
 use audioviz::utils::{seperate_channels, apodize};
 
-use audioviz::processor::{Processor, Plugin};
+use audioviz::processor::{Processor, Plugin, Bandpass};
 
 use std::io::Write;
 
 const BUFFER_LENGTH: usize = 1024;
-const LOWPASS: bool = true;
+const BANDPASS: bool = true;
 
 #[macroquad::main("AudioScope")]
 async fn main() {
@@ -47,32 +47,31 @@ async fn main() {
         if drain_amount < buffer.len() as isize && drain_amount > 0 {
             buffer.drain(0..drain_amount as usize);
         }
+        let mut data = buffer.clone();
+        if !data.is_empty() {apodize(&mut data)}
+
+        // bandpass-filter
+        if BANDPASS && !data.is_empty() {
+            let mut processor = Processor {
+                data: data.to_vec(),
+                sampling_rate: audio_capture.sampling_rate.unwrap() as f32,
+                plugins: vec![
+                    Plugin::Bandpass(Bandpass::new(100.0, 200.0, 5000.0, 6000.0)),
+                ],
+            };
+            processor.process();
+            data = processor.data;
+        }
 
         clear_background(BLACK);
-        
+
+
         // draw lines
         let height = screen_height();
         let width = screen_width();
 
-        if !buffer.is_empty() {
-            // lowpass-filter
-            if LOWPASS {
-                let mut processor = Processor {
-                    data: buffer.to_vec(),
-                    sampling_rate: audio_capture.sampling_rate.unwrap_or(0) as f32,
-                    plugins: vec![
-                        Plugin::Lowpass{cutoff_frequency: 100.0}
-                    ],
-                };
-                processor.process();
-                buffer = processor.data;
-            }
-
-            // apdize
-            let mut apodized_buffer = buffer.clone();
-            apodize(&mut apodized_buffer);
-    
-            let mut data = apodized_buffer.iter().peekable();
+        if !data.is_empty() {       
+            let mut data = data.iter().peekable();
             let mut x: f32 = 0.5;
             loop {
                 // determines positions of line

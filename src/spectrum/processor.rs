@@ -74,7 +74,10 @@ impl Processor {
 
     /// processes fft algorithm on `raw_buffer`
     pub fn fft(&mut self) {
-        self.raw_buffer = fft::process(&self.raw_buffer);
+        let fft = fft::forward(&self.raw_buffer);
+        let fft = fft::normalize(&fft);
+        let fft = fft::remove_mirroring(&fft);
+        self.raw_buffer = fft;
     }
 
     /// normalizes volume on `raw_buffer` so that higher frequencies are louder

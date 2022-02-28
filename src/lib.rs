@@ -139,7 +139,9 @@ mod tests {
             x += 0.1;
         }
     
-        let fft = fft::process(&buffer);
+        let fft = fft::forward(&buffer);
+        let fft = fft::normalize(&fft);
+        let fft = fft::remove_mirroring(&fft);
     
         assert_eq!(
             fft,
@@ -151,7 +153,8 @@ mod tests {
                 0.74589825,
                 0.63307375,
                 0.569189,
-                0.5359103,         
+                0.5359103,
+                0.52553797    
             ]
         )
     }

@@ -4,11 +4,7 @@ use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 use audioviz::distributor::Distributor;
 
-use audioviz::processor::{Processor, Plugin};
-
 use std::io::Write;
-
-const LOWPASS: bool = false;
 
 #[macroquad::main("AudioSpectrum")]
 async fn main() {
@@ -27,11 +23,12 @@ async fn main() {
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
     let stream_config: StreamConfig = StreamConfig {
         channel_count: audio_capture.channel_count.unwrap(),
-        gravity: Some(6.0),
+        gravity: Some(1.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
             frequency_bounds: [50, 20_000],
-	    interpolation: Interpolation::Step,
+            interpolation: Interpolation::Step,
+            volume: 0.1,
             ..Default::default()
         },
         ..Default::default()
@@ -42,39 +39,25 @@ async fn main() {
         if let Some(data) = audio_receiver.receive_data() {
             distributor.push_auto(&data);
         }
-        let mut data = distributor.pop_auto(None);
+        let data = distributor.pop_auto(None);
 
-        if !data.is_empty() {
-            // lowpass-filter
-            if LOWPASS {
-                let mut processor = Processor {
-                    data: data,
-                    sampling_rate: audio_capture.sampling_rate.unwrap_or(0) as f32,
-                    plugins: vec![
-                        Plugin::Lowpass{cutoff_frequency: 100.0}
-                    ],
-                };
-                processor.process();
-                data = processor.data;
-            }
-            stream.push_data(data);
+        stream.push_data(data);
 
-            stream.update();
-        }
+        stream.update();
         
         let frequencies: Vec<Vec<Frequency>> = stream.get_frequencies();
         let frequencies: Vec<Frequency> = if frequencies.len() >= 2 {
-            let mut buf: Vec<Frequency> = Vec::new();
+        let mut buf: Vec<Frequency> = Vec::new();
 
-            // left
-            let mut left = frequencies[0].clone();
-            left.reverse();
-            buf.append(&mut left);
+        // left
+        let mut left = frequencies[0].clone();
+        left.reverse();
+        buf.append(&mut left);
 
-            // right
-            buf.append(&mut frequencies[1].clone());
+        // right
+        buf.append(&mut frequencies[1].clone());
 
-            buf
+        buf
         } else {
             if frequencies.len() == 1 {
                 frequencies[0].clone()
@@ -102,8 +85,8 @@ async fn main() {
                 Some(d) => *d,
                 None => break
             };
-            let y1: f32 = height - (f1.volume * height * 0.25);
-            let y2: f32 = height - (f2.volume * height * 0.25);
+            let y1: f32 = height - (f1.volume * height);
+            let y2: f32 = height - (f2.volume * height);
 
             let x1: f32 = (x / frequencies.len() as f32) * width;
             let x2: f32 = ( (x + 1.0) / frequencies.len() as f32 ) * width;

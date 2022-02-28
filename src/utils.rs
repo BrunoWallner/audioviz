@@ -20,3 +20,14 @@ pub fn apodize(data: &mut Vec<f32>) {
         *value *= window[i] as f32;
     }
 }
+
+#[cfg(all(feature = "apodize", feature = "fft"))]
+use crate::fft::Complex;
+
+#[cfg(all(feature = "apodize", feature = "fft"))]
+pub fn apodize_complex(data: &mut Vec<Complex<f32>>) {
+    let window = apodize::hanning_iter(data.len()).collect::<Vec<f64>>();
+    for (i, value) in data.iter_mut().enumerate() {
+        value.re *= window[i] as f32;
+    }
+}
