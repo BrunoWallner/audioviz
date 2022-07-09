@@ -1,3 +1,6 @@
+# NOTE
+this repository has moved to [codeberg](https://codeberg.org/BrunoWallner/audioviz)
+
 # audioviz
  Audioviz is a simple and easy to use library that helps you visualise raw audio-data
 
