@@ -9,7 +9,7 @@ use audioviz::processor::{Processor, Plugin, Bandpass};
 use std::io::Write;
 
 const BUFFER_LENGTH: usize = 1024;
-const BANDPASS: bool = true;
+const BANDPASS: bool = false;
 
 #[macroquad::main("AudioScope")]
 async fn main() {
@@ -22,8 +22,7 @@ async fn main() {
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
 
-    audio_capture.init(&Device::Id(id)).unwrap();
-    let audio_receiver = audio_capture.get_receiver().unwrap();
+    let (channel_count, sampling_rate, audio_receiver) = audio_capture.init(&Device::Id(id)).unwrap();
 
     let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
 
@@ -34,7 +33,7 @@ async fn main() {
             distributor.push_auto(&data);
         }
         let data = distributor.pop_auto(None);
-        let data = seperate_channels(&data, audio_capture.channel_count.unwrap() as usize);
+        let data = seperate_channels(&data, channel_count as usize);
         let mut data: Vec<f32> = if !data.is_empty() {
             data[0].clone()
         } else {
@@ -54,7 +53,7 @@ async fn main() {
         if BANDPASS && !data.is_empty() {
             let mut processor = Processor {
                 data: data.to_vec(),
-                sampling_rate: audio_capture.sampling_rate.unwrap() as f32,
+                sampling_rate: sampling_rate as f32,
                 plugins: vec![
                     Plugin::Bandpass(Bandpass::new(100.0, 200.0, 5000.0, 6000.0)),
                 ],

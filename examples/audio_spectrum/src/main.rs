@@ -2,7 +2,9 @@ use macroquad::prelude::*;
 
 use audioviz::audio_capture::capture::{Capture, Device};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
-use audioviz::distributor::Distributor;
+
+const BUFFER_CAP: usize = 4096;
+const RESOLUTION: usize = 1024;
 
 use std::io::Write;
 
@@ -17,13 +19,11 @@ async fn main() {
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
 
-    audio_capture.init(&Device::Id(id)).unwrap();
-    let audio_receiver = audio_capture.get_receiver().unwrap();
+    let (channel_count, _sampling_rate, audio_receiver) = audio_capture.init(&Device::Id(id)).unwrap();
 
-    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
     let stream_config: StreamConfig = StreamConfig {
-        channel_count: audio_capture.channel_count.unwrap(),
-        gravity: Some(1.0),
+        channel_count: channel_count,
+        gravity: Some(2.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
             frequency_bounds: [50, 20_000],
@@ -35,13 +35,22 @@ async fn main() {
     };
     let mut stream: Stream = Stream::new(stream_config);
 
+    let mut buffer: Vec<f32> = Vec::new();
+    let mut data: Vec<f32> = Vec::new();
     loop {
-        if let Some(data) = audio_receiver.receive_data() {
-            distributor.push_auto(&data);
+        if let Some(mut new_data) = audio_receiver.receive_data() {
+            if buffer.len() > BUFFER_CAP {
+                let end = buffer.len() - BUFFER_CAP;
+                buffer.drain(0..end);
+            }
+            buffer.append(&mut new_data);
         }
-        let data = distributor.pop_auto(None);
+        if buffer.len() > RESOLUTION {
+            let start = buffer.len() - RESOLUTION;
+            data = buffer.drain(start..).as_slice().to_vec();
+        }
 
-        stream.push_data(data);
+        stream.push_data(data.clone());
 
         stream.update();
         

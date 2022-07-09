@@ -51,11 +51,8 @@ impl CaptureReceiver {
 }
 
 pub struct Capture {
-    pub channel_count: Option<u16>,
-    pub sampling_rate: Option<u32>,
     host: cpal::platform::Host,
-    // will receive data in constant intervall from distributor
-    sender: Option<mpsc::Sender<CaptureEvent>>,
+    // stream must stay in scope
     stream: Option<cpal::Stream>,
 }
 impl Capture {
@@ -63,14 +60,12 @@ impl Capture {
         let host = cpal::default_host();
 
         return Self {
-            sampling_rate: None,
-            channel_count: None,
             host,
-            sender: None,
             stream: None,
         }
     }
-    pub fn init(&mut self, device: &Device) -> Result<(), Error> {
+    /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
+    pub fn init(&mut self, device: &Device) -> Result<(u16, u32, CaptureReceiver), Error> {
         let (sender, receiver) = mpsc::channel();
 
         let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, sender.clone(), device) {
@@ -83,24 +78,9 @@ impl Capture {
             handle_events(receiver);
         });
 
-        self.sampling_rate = Some(sampling_rate);
-        self.channel_count = Some(channel_count);
         self.stream = Some(stream);
-        self.sender = Some(sender);
 
-        Ok(())
-    }
-
-    /// request a receiver that receives the distributed audio data as f32 samples
-    ///
-    /// you can request multiple receivers out of one Capture
-    #[allow(unused_must_use)]
-    pub fn get_receiver(&self) -> Option<CaptureReceiver> {
-        if let Some(sender) = self.sender.clone() {
-            Some(CaptureReceiver {sender})
-        } else {
-            None
-        }
+        Ok((channel_count, sampling_rate, CaptureReceiver{sender}))
     }
 
     pub fn fetch_devices(&self) -> Result<Vec<String>, Error> {

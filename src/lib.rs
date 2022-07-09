@@ -15,8 +15,7 @@
 //!
 //! // captures audio from system using cpal
 //! let mut audio_capture = Capture::new();
-//! audio_capture.init(&Device::DefaultInput).unwrap();
-//! let audio_receiver = audio_capture.get_receiver().unwrap();
+//! let (channel_count, sampling_rate, audio_receiver) = audio_capture.init(&Device::DefaultInput).unwrap();
 //!
 //! // smooths choppy audio data received from audio_receiver
 //! let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(8128));
