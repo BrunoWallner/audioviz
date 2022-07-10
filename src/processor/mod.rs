@@ -56,6 +56,7 @@ pub enum Plugin {
     Bandpass(Bandpass)
 }
 
+/// data must be single channel only
 pub struct Processor {
     pub data: Vec<f32>,
     pub sampling_rate: f32,
@@ -83,5 +84,32 @@ impl Processor {
                 }
             }
         }
+    }
+}
+
+use crate::utils::{seperate_channels, combine_channels};
+
+/// extension of Processor to support multi-channel processing
+pub struct MultiChannelProcessor {
+    pub data: Vec<f32>,
+    pub sampling_rate: f32,
+    pub plugins: Vec<Plugin>,
+    pub channel_count: usize,
+}
+impl MultiChannelProcessor {
+    pub fn process(&mut self) {
+        let data = seperate_channels(&self.data, self.channel_count as usize);
+
+        let mut processed_data: Vec<Vec<f32>> = Vec::new();
+        for d in data.iter() {
+            let mut processor = Processor {
+                data: d.clone(),
+                sampling_rate: self.sampling_rate,
+                plugins: self.plugins.clone(),
+            };
+            processor.process();
+            processed_data.push(processor.data);
+        }
+        self.data = combine_channels(processed_data)
     }
 }

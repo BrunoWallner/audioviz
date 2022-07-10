@@ -1,5 +1,4 @@
 use core::f32::consts::PI;
-
 use crate::fft;
 
 //
@@ -47,9 +46,10 @@ pub fn highpass_filter(data: &[f32], sampling_rate: f32, cutoff_frequency: f32) 
 }
 */
 
+
+// TODO! improve filtering
 pub fn lowpass_filter(data: &[f32], sampling_rate: f32, cutoff_start_freq: f32, cutoff_end_freq: f32) -> Vec<f32> {
     assert!(cutoff_end_freq >= cutoff_start_freq);
-
     assert!(cutoff_start_freq <= sampling_rate / 2.0 && cutoff_end_freq <= sampling_rate / 2.0);
 
     let len = data.len();

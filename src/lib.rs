@@ -42,10 +42,7 @@
 pub mod spectrum;
 
 #[cfg(feature = "cpal")]
-pub mod audio_capture;
-
-#[cfg(feature = "distributor")]
-pub mod distributor;
+pub mod io;
 
 #[cfg(feature = "processor")]
 pub mod processor;
@@ -85,45 +82,6 @@ mod tests {
                 .status()
                 .unwrap();
             assert!(command.success(), "failed at {} example", example);    
-        }
-    }
-
-    #[cfg(feature = "distributor")]
-    #[cfg(feature = "std")]
-    #[test]
-    fn distributor() {
-        use std::{time::Duration, thread::sleep};
-        use Distributor;
-
-        let estimated_data_rate: f64 = 8.0 * 1000.0 / 5.0;
-        let mut distributor: Distributor<u128> = Distributor::new(estimated_data_rate, Some(16));
-
-        let mut counter: u128 = 0;
-        'distribution: loop {
-            if counter % 5 == 0 {
-                let mut buffer: Vec<u128> = Vec::new();
-                for _ in 0..=8 {
-                    buffer.push(0);
-                }
-
-                distributor.push_auto(&buffer);
-            }
-
-            let data = distributor.pop_auto(None);
-            let buf_len = distributor.clone_buffer().len();
-
-            // if sample rate is fully known with 2 pushes
-            if counter >= 10 {
-                assert!(data.len() > 0);
-                assert!(buf_len <= 16);
-            }
-
-            counter += 1;
-            sleep(Duration::from_millis(1));
-
-            if counter > 100 {
-                break 'distribution;
-            }
         }
     }
 

@@ -9,53 +9,39 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use log::warn;
-use std::sync::mpsc;
-use std::thread;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::converter;
+use super::super::Device;
+use super::super::Error;
 
-#[derive(Clone, Debug)]
-pub enum Error {
-    DeviceNotFound,
-    DeviceNotAvailable,
-    UnsupportedConfig,
-    BackendSpecific(String),
+#[derive(Clone)]
+pub struct InputController {
+    data: Arc<Mutex<Vec<f32>>>,
 }
+impl InputController {
+    pub fn pull_data(&self) -> Vec<f32> {
+        let mut d = self.get_data();
+        let out = d.drain(..).as_slice().to_vec();
+        out
+    }
 
-#[derive(Clone, Debug)]
-enum CaptureEvent {
-    SendData(Vec<f32>),
-    ReceiveData(mpsc::Sender<Option<Vec<f32>>>),
-}
-
-#[derive(Clone, Debug)]
-pub enum Device {
-    DefaultInput,
-    DefaultOutput,
-    Id(usize),
-}
-
-pub struct CaptureReceiver {
-    sender: mpsc::Sender<CaptureEvent>,
-}
-impl CaptureReceiver {
-    #[allow(unused_must_use)]
-    pub fn receive_data(&self) -> Option<Vec<f32>> {
-        let (sender, receiver) = mpsc::channel();
-        self.sender.send(CaptureEvent::ReceiveData(sender));
-        match receiver.recv() {
-            Ok(val) => val,
-            Err(_) => None,
-        }
+    // internal use only
+    fn get_data(&self) -> MutexGuard<'_, Vec<f32>> {
+        self.data.lock().unwrap()
+    }
+    fn append_data(&self, data: &[f32]) {
+        let mut d = self.get_data();
+        d.append(&mut data.to_vec());
     }
 }
 
-pub struct Capture {
+pub struct Input {
     host: cpal::platform::Host,
     // stream must stay in scope
     stream: Option<cpal::Stream>,
 }
-impl Capture {
+impl Input {
     pub fn new() -> Self{
         let host = cpal::default_host();
 
@@ -65,22 +51,19 @@ impl Capture {
         }
     }
     /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
-    pub fn init(&mut self, device: &Device) -> Result<(u16, u32, CaptureReceiver), Error> {
-        let (sender, receiver) = mpsc::channel();
+    pub fn init(&mut self, device: &Device) -> Result<(u16, u32, InputController), Error> {
+        let input_controller = InputController{
+            data: Arc::new(Mutex::new(Vec::new()))
+        };
 
-        let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, sender.clone(), device) {
+        let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, input_controller.clone(), device) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
 
-        // initiates event handler
-        thread::spawn(move || {
-            handle_events(receiver);
-        });
-
         self.stream = Some(stream);
 
-        Ok((channel_count, sampling_rate, CaptureReceiver{sender}))
+        Ok((channel_count, sampling_rate, input_controller))
     }
 
     pub fn fetch_devices(&self) -> Result<Vec<String>, Error> {
@@ -102,33 +85,9 @@ impl Capture {
     }
 }
 
-#[allow(unused_must_use)]
-fn handle_events(receiver: mpsc::Receiver<CaptureEvent>) {
-    let mut data: Vec<f32> = Vec::new();
-
-    loop {
-        if let Ok(event) = receiver.recv() {
-            match event {
-                CaptureEvent::SendData(mut d) => {
-                    data.append(&mut d);
-                }
-                CaptureEvent::ReceiveData(sender) => {
-                    //sender.send(data.clone());
-                    if !data.is_empty() {
-                        sender.send(Some(data.clone()));
-                    } else {
-                        sender.send(None);
-                    }
-                    data.drain(..);
-                }
-            }
-        }
-    }
-}
-
 fn stream_audio_to_distributor(
     host: &cpal::platform::Host,
-    sender: mpsc::Sender<CaptureEvent>,
+   input_controller: InputController,
     device: &Device,
     // returns channel-count, stream and sampling-rate
 ) -> Result<(u16, cpal::Stream, u32), Error> {
@@ -163,7 +122,7 @@ fn stream_audio_to_distributor(
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             move |data: &[f32], _: &_| {
-                sender.send(CaptureEvent::SendData(data.to_vec()));
+                input_controller.append_data(data);
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
@@ -171,7 +130,7 @@ fn stream_audio_to_distributor(
             &config.into(),
             move |data: &[i16], _: &_| {
                 let data = converter::i16_to_f32(data);
-                sender.send(CaptureEvent::SendData(data.to_vec()));
+                input_controller.append_data(&data);
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
@@ -179,7 +138,7 @@ fn stream_audio_to_distributor(
             &config.into(),
             move |data: &[u16], _: &_| {
                 let data = converter::u16_to_f32(data);
-                sender.send(CaptureEvent::SendData(data.to_vec()));
+                input_controller.append_data(&data);
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),

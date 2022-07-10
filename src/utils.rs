@@ -13,6 +13,25 @@ pub fn seperate_channels(data: &[f32], channel_count: usize) -> Vec<Vec<f32>> {
     buffer
 }
 
+pub fn combine_channels(mut data: Vec<Vec<f32>>) -> Vec<f32> {
+    let mut buffer: Vec<f32> = Vec::new();
+    loop {
+        let mut end: Vec<bool> = vec![false; data.len()];
+        for (i, d) in data.iter_mut().enumerate() {
+            if d.len() > 0 {
+                buffer.push(d.remove(0));
+            }
+            else {
+                end[i] = true
+            }
+        }
+        if !end.contains(&false) {
+            break
+        }
+    }
+    buffer
+}
+
 #[cfg(feature = "apodize")]
 pub fn apodize(data: &mut Vec<f32>) {
     let window = apodize::hanning_iter(data.len()).collect::<Vec<f64>>();
