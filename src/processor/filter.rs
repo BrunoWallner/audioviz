@@ -66,16 +66,18 @@ pub fn lowpass_filter(data: &[f32], sampling_rate: f32, cutoff_start_freq: f32, 
     let step: f32 = PI / diff as f32;
 
     let mut position: f32 = 0.0;
-    for i in start..=end {
-        let mul = (position.cos() + 1.0) / 2.0;
-        spectrum[i] *= mul;
-        spectrum[len - i - 1] *= mul;
-
-        position += step;
-    }
-    for i in end..spectrum_len {
-        spectrum[i] *= 0.0;
-        spectrum[len - i - 1] *= 0.0;
+    if !spectrum.is_empty() {
+        for i in start..=end {
+            let mul = (position.cos() + 1.0) / 2.0;
+            spectrum[i] *= mul;
+            spectrum[len - i - 1] *= mul;
+    
+            position += step;
+        }
+        for i in end..spectrum_len {
+            spectrum[i] *= 0.0;
+            spectrum[len - i - 1] *= 0.0;
+        }
     }
 
     let data = fft::inverse(&spectrum);
@@ -85,7 +87,6 @@ pub fn lowpass_filter(data: &[f32], sampling_rate: f32, cutoff_start_freq: f32, 
 
 pub fn highpass_filter(data: &[f32], sampling_rate: f32, cutoff_start_freq: f32, cutoff_end_freq: f32) -> Vec<f32> {
     assert!(cutoff_end_freq <= cutoff_start_freq);
-
     assert!(cutoff_start_freq <= sampling_rate / 2.0 && cutoff_end_freq <= sampling_rate / 2.0);
 
     let len = data.len();
@@ -102,16 +103,18 @@ pub fn highpass_filter(data: &[f32], sampling_rate: f32, cutoff_start_freq: f32,
     let step: f32 = PI / diff as f32;
 
     let mut position: f32 = PI;
-    for i in start..=end {
-        let mul = (position.cos() + 1.0) / 2.0;
-        spectrum[i] *= mul;
-        spectrum[len - i - 1] *= mul;
-
-        position -= step;
-    }
-    for i in 0..=start {
-        spectrum[i] *= 0.0;
-        spectrum[len - i - 1] *= 0.0;
+    if !spectrum.is_empty() {
+        for i in start..=end {
+            let mul = (position.cos() + 1.0) / 2.0;
+            spectrum[i] *= mul;
+            spectrum[len - i - 1] *= mul;
+    
+            position -= step;
+        }
+        for i in 0..=start {
+            spectrum[i] *= 0.0;
+            spectrum[len - i - 1] *= 0.0;
+        }
     }
 
     let data = fft::inverse(&spectrum);
