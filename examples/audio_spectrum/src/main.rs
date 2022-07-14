@@ -3,9 +3,6 @@ use macroquad::prelude::*;
 use audioviz::io::{Device, Input};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 
-const BUFFER_CAP: usize = 4096;
-const RESOLUTION: usize = 1024;
-
 use std::io::Write;
 
 #[macroquad::main("AudioSpectrum")]
@@ -23,7 +20,7 @@ async fn main() {
 
     let stream_config: StreamConfig = StreamConfig {
         channel_count: channel_count,
-        gravity: Some(2.0),
+        gravity: Some(5.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
             frequency_bounds: [50, 20_000],
@@ -34,23 +31,10 @@ async fn main() {
         ..Default::default()
     };
     let mut stream: Stream = Stream::new(stream_config);
-
-    let mut buffer: Vec<f32> = Vec::new();
-    let mut data: Vec<f32> = Vec::new();
     loop {
-        if let Some(mut new_data) = audio_receiver.pull_data() {
-            if buffer.len() > BUFFER_CAP {
-                let end = buffer.len() - BUFFER_CAP;
-                buffer.drain(0..end);
-            }
-            buffer.append(&mut new_data);
+        if let Some(new_data) = audio_receiver.pull_data() {
+            stream.push_data(new_data);
         }
-        if buffer.len() > RESOLUTION {
-            let start = buffer.len() - RESOLUTION;
-            data = buffer.drain(start..).as_slice().to_vec();
-        }
-
-        stream.push_data(data.clone());
 
         stream.update();
         
