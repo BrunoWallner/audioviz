@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use audioviz::audio_capture::capture::{Capture, Device};
+use audioviz::io::{Device, Input};
 use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
 
 const BUFFER_CAP: usize = 4096;
@@ -10,16 +10,16 @@ use std::io::Write;
 
 #[macroquad::main("AudioSpectrum")]
 async fn main() {
-    let mut audio_capture = Capture::new();
+    let mut audio_input = Input::new();
 
     // device selection
-    let devices = audio_capture.fetch_devices().unwrap();
+    let devices = audio_input.fetch_devices().unwrap();
     for (id, device) in devices.iter().enumerate() {
         println!("{id}\t{device}");
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
 
-    let (channel_count, _sampling_rate, audio_receiver) = audio_capture.init(&Device::Id(id)).unwrap();
+    let (channel_count, _sampling_rate, audio_receiver) = audio_input.init(&Device::Id(id)).unwrap();
 
     let stream_config: StreamConfig = StreamConfig {
         channel_count: channel_count,
@@ -38,7 +38,7 @@ async fn main() {
     let mut buffer: Vec<f32> = Vec::new();
     let mut data: Vec<f32> = Vec::new();
     loop {
-        if let Some(mut new_data) = audio_receiver.receive_data() {
+        if let Some(mut new_data) = audio_receiver.pull_data() {
             if buffer.len() > BUFFER_CAP {
                 let end = buffer.len() - BUFFER_CAP;
                 buffer.drain(0..end);

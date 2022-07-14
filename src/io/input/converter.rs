@@ -1,3 +1,5 @@
+/// Converts `i16` and `u16` samples to `f32`
+
 pub fn i16_to_f32(sample: &[i16]) -> Vec<f32> {
     let f32_sample: Vec<f32> = sample
         .into_iter()

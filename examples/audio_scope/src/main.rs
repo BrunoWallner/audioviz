@@ -1,7 +1,6 @@
 use macroquad::prelude::*;
 
-use audioviz::audio_capture::capture::{Capture, Device};
-use audioviz::distributor::Distributor;
+use audioviz::io::{Input, Device};
 use audioviz::utils::{seperate_channels, apodize};
 
 use audioviz::processor::{Processor, Plugin, Bandpass};
@@ -13,33 +12,24 @@ const BANDPASS: bool = false;
 
 #[macroquad::main("AudioScope")]
 async fn main() {
-    let mut audio_capture = Capture::new();
+    let mut audio_input = Input::new();
 
     // device selection
-    let devices = audio_capture.fetch_devices().unwrap();
+    let devices = audio_input.fetch_devices().unwrap();
     for (id, device) in devices.iter().enumerate() {
         println!("{id}\t{device}");
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
 
-    let (channel_count, sampling_rate, audio_receiver) = audio_capture.init(&Device::Id(id)).unwrap();
-
-    let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(5000));
+    let (channel_count, sampling_rate, audio_receiver) = audio_input.init(&Device::Id(id)).unwrap();
 
     let mut buffer: Vec<f32> = Vec::new();
 
     loop {
-        if let Some(data) = audio_receiver.receive_data() {
-            distributor.push_auto(&data);
+        if let Some(new_data) = audio_receiver.pull_data() {
+            let mut data = seperate_channels(&new_data, channel_count as usize);
+            buffer.append(&mut data[0]);
         }
-        let data = distributor.pop_auto(None);
-        let data = seperate_channels(&data, channel_count as usize);
-        let mut data: Vec<f32> = if !data.is_empty() {
-            data[0].clone()
-        } else {
-            vec![]
-        };
-        buffer.append(&mut data);
 
         let wanted_buf_size: u64 = BUFFER_LENGTH as u64; 
         let drain_amount: isize = buffer.len() as isize - wanted_buf_size as isize;
@@ -63,7 +53,6 @@ async fn main() {
         }
 
         clear_background(BLACK);
-
 
         // draw lines
         let height = screen_height();

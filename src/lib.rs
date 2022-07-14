@@ -9,27 +9,20 @@
 //!
 //!# Code Example with spectrum
 //!```
-//! use audioviz::audio_capture::capture::{Capture, Device};
+//! use audioviz::io::{Input, Device};
 //! use audioviz::spectrum::{Frequency, config::{StreamConfig, ProcessorConfig, Interpolation}, stream::Stream};
-//! use audioviz::distributor::Distributor;
 //!
 //! // captures audio from system using cpal
-//! let mut audio_capture = Capture::new();
-//! let (channel_count, sampling_rate, audio_receiver) = audio_capture.init(&Device::DefaultInput).unwrap();
-//!
-//! // smooths choppy audio data received from audio_receiver
-//! let mut distributor: Distributor<f32> = Distributor::new(44_100.0, Some(8128));
+//! let mut audio_input = Input::new();
+//! let (channel_count, sampling_rate, input_controller) = audio_input.init(&Device::DefaultInput).unwrap();
 //!
 //! // spectrum visualizer stream
 //! let mut stream: Stream = Stream::new(StreamConfig::default()); 
 //! loop {
-//!     if let Some(data) = audio_receiver.receive_data() {
-//!         distributor.push_auto(&data);
+//!     if let Some(data) = input_controller.pull_data() {
+//!         stream.push_data(data);
+//!         stream.update();
 //!     }
-//!     let data = distributor.pop_auto(None);
-//!     stream.push_data(data);
-//!
-//!     stream.update();
 //!
 //!     let frequencies = stream.get_frequencies();
 //!
@@ -70,7 +63,7 @@ mod tests {
             "audio_scope",
             "audio_spectrum",
             "device_selector",
-            "distributor"
+            "osc",
         ];
 
         for example in examples {

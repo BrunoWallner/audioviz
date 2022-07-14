@@ -20,10 +20,14 @@ pub struct InputController {
     data: Arc<Mutex<Vec<f32>>>,
 }
 impl InputController {
-    pub fn pull_data(&self) -> Vec<f32> {
+    pub fn pull_data(&self) -> Option<Vec<f32>> {
         let mut d = self.get_data();
         let out = d.drain(..).as_slice().to_vec();
-        out
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
     }
 
     // internal use only
