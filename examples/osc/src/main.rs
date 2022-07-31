@@ -102,18 +102,39 @@ async fn main() {
         let thickness: f32 = (height + width) / 1000.0;
         let l_r = data.get();
 
+        // -------------
+        //    General 
+        // -------------
+        let mut data: Vec<f32> = Vec::new();
+        for d in l_r.iter() {
+            data.push(d[0]);
+            data.push(d[1]);
+        }
+        let mut processor = MultiChannelProcessor {
+            data,
+            sampling_rate: sampling_rate as f32,
+            plugins: vec![
+                Plugin::Lowpass(Lowpass::new(4000.0, 5000.0))
+            ],
+            channel_count: channel_count as usize,
+        };
+        processor.process();
+        let out = seperate_channels(&processor.data, channel_count as usize);
+        let mut l_r_g: Vec<[f32; 2]> = Vec::new();
+        for i in 0..out[0].len() {
+            l_r_g.push([
+                out[0][i],
+                out[1][i],
+            ]);
+        }
+
         // calc points out of left and right channel
-        let mut alpha: f32 = 0.0;
         let mut points: Vec<[f32; 2]> = Vec::new();
-        for l_r in l_r.iter() {
+        for l_r in l_r_g.iter() {
             let p1 = l_r[0];
             let p2 = l_r[1];
-            let a = (((p1 - 0.0).powi(2) + (p2 - 0.0).powi(2)).sqrt() * 255.0).clamp(0.0, 255.0);
-            alpha += a;
             points.push([p1 * 0.9 + 0.5, p2 * -0.9 + 0.5]);
         }
-        alpha /= l_r.len() as f32;
-        let alpha = alpha.clamp(1.0, 255.0) as u8;
 
         // actual drawing using macroquad
         // lines
@@ -127,7 +148,7 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(255 - alpha, alpha, 100 - alpha, alpha.clamp(100, 255))
+                        Color::from_rgba(255, 0, 100, 200)
                     )
                 } else {
                     break
@@ -139,59 +160,7 @@ async fn main() {
 
         // points
         for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(100 - alpha, alpha, 255 - alpha, alpha.clamp(100, 255)));
-        }
-
-        // -------------
-        //    Treble 
-        // -------------
-        let mut data: Vec<f32> = Vec::new();
-        for d in l_r.iter() {
-            data.push(d[0]);
-            data.push(d[1]);
-        }
-        let mut processor = MultiChannelProcessor {
-            data,
-            sampling_rate: sampling_rate as f32,
-            plugins: vec![
-                Plugin::Highpass(Highpass::new(5000.0, 4000.0))
-            ],
-            channel_count: channel_count as usize,
-        };
-        processor.process();
-        let out = seperate_channels(&processor.data, channel_count as usize);
-        let mut l_r_t: Vec<[f32; 2]> = Vec::new();
-        for i in 0..out[0].len() {
-            l_r_t.push([
-                out[0][i],
-                out[1][i],
-            ]);
-        }
-
-        let mut points: Vec<[f32; 2]> = Vec::new();
-        for l_r_t in l_r_t.iter() {
-            let p1 = l_r_t[0];
-            let p2 = l_r_t[1];
-            points.push([p1 * 0.9 + 0.5, p2 * -0.9 + 0.5]);
-        }
-        let mut line_points = points.iter().peekable();
-        loop {
-            if let Some(p0) =  line_points.next() {
-                if let Some(p1) = line_points.peek() {
-                    draw_line(
-                        p0[0] * width,
-                        p0[1] * height,
-                        p1[0] * width,
-                        p1[1] * height,
-                        thickness,
-                        Color::from_rgba(0, 255, 55, 50)
-                    )
-                } else {
-                    break
-                }
-            } else {
-                break
-            }
+            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(225, 0, 255, 127));
         }
 
         // -------------
@@ -228,7 +197,59 @@ async fn main() {
         }
         // points
         for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(0, 150, 255, 100));
+            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(0, 112, 255, 255));
+        }
+
+        // -------------
+        //    Treble 
+        // -------------
+        let mut data: Vec<f32> = Vec::new();
+        for d in l_r.iter() {
+            data.push(d[0]);
+            data.push(d[1]);
+        }
+        let mut processor = MultiChannelProcessor {
+            data,
+            sampling_rate: sampling_rate as f32,
+            plugins: vec![
+                Plugin::Highpass(Highpass::new(4000.0, 3500.0))
+            ],
+            channel_count: channel_count as usize,
+        };
+        processor.process();
+        let out = seperate_channels(&processor.data, channel_count as usize);
+        let mut l_r_t: Vec<[f32; 2]> = Vec::new();
+        for i in 0..out[0].len() {
+            l_r_t.push([
+                out[0][i],
+                out[1][i],
+            ]);
+        }
+
+        let mut points: Vec<[f32; 2]> = Vec::new();
+        for l_r_t in l_r_t.iter() {
+            let p1 = l_r_t[0];
+            let p2 = l_r_t[1];
+            points.push([p1 * 0.9 + 0.5, p2 * -0.9 + 0.5]);
+        }
+        let mut line_points = points.iter().peekable();
+        loop {
+            if let Some(p0) =  line_points.next() {
+                if let Some(p1) = line_points.peek() {
+                    draw_line(
+                        p0[0] * width,
+                        p0[1] * height,
+                        p1[0] * width,
+                        p1[1] * height,
+                        thickness,
+                        Color::from_rgba(0, 255, 55, 100)
+                    )
+                } else {
+                    break
+                }
+            } else {
+                break
+            }
         }
 
         next_frame().await
