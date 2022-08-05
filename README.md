@@ -16,6 +16,7 @@
 | feature | description |
 |---------|-------------|
 | `io`  | capturing of system audio using [CPAL](https://github.com/RustAudio/cpal)  |
+| `processor` | processing and filtering of audio data |
 | `serde` | implementation of Serialize and Deserialize traits |
 | `distributor` | helper for choppy audio-data stream smoothing |
 | `spectrum` | spectrum visualisation module |

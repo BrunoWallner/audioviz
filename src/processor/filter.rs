@@ -159,34 +159,36 @@ pub fn bandpass_filter(
 
     // smooth transition between cut and not cut freqs
     // lowcut
-    let mut low_position: f32 = PI;
-    for i in low_start..=low_end {
-        let mul = (low_position.cos() + 1.0) / 2.0;
-        spectrum[i] *= mul;
-        spectrum[len - i - 1] *= mul;
+    if !spectrum.is_empty() {
+        let mut low_position: f32 = PI;
+        for i in low_start..=low_end {
+            let mul = (low_position.cos() + 1.0) / 2.0;
+            spectrum[i] *= mul;
+            spectrum[len - i - 1] *= mul;
+    
+            low_position -= low_step;
+        }
+        // highcut
+        let mut high_position: f32 = 0.0;
+        for i in high_start..=high_end {
+            let mul = (high_position.cos() + 1.0) / 2.0;
+            spectrum[i] *= mul;
+            spectrum[len - i - 1] *= mul;
+    
+            high_position += high_step;
+        }
 
-        low_position -= low_step;
-    }
-    // highcut
-    let mut high_position: f32 = 0.0;
-    for i in high_start..=high_end {
-        let mul = (high_position.cos() + 1.0) / 2.0;
-        spectrum[i] *= mul;
-        spectrum[len - i - 1] *= mul;
-
-        high_position += high_step;
-    }
-
-    // mutes freqs that are beyond threshold
-    // left from lowcut
-    for i in 0..=low_start {
-        spectrum[i] *= 0.0;
-        spectrum[len - i - 1] *= 0.0;
-    }
-    // right from highcut
-    for i in high_end..=spectrum_len {
-        spectrum[i] *= 0.0;
-        spectrum[len - i - 1] *= 0.0;
+        // mutes freqs that are beyond threshold
+        // left from lowcut
+        for i in 0..=low_start {
+            spectrum[i] *= 0.0;
+            spectrum[len - i - 1] *= 0.0;
+        }
+        // right from highcut
+        for i in high_end..=spectrum_len {
+            spectrum[i] *= 0.0;
+            spectrum[len - i - 1] *= 0.0;
+        }
     }
 
     let data = fft::inverse(&spectrum);

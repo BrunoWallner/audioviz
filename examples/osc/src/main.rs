@@ -1,7 +1,7 @@
 use audioviz::io::{Input, InputController};
 use audioviz::io::Device;
 use audioviz::utils::seperate_channels;
-use audioviz::processor::{MultiChannelProcessor, Plugin, Lowpass, Highpass};
+use audioviz::processor::{MultiChannelProcessor, Plugin, Lowpass, Highpass, Bandpass};
 
 use macroquad::prelude::*;
 
@@ -103,67 +103,6 @@ async fn main() {
         let l_r = data.get();
 
         // -------------
-        //    General 
-        // -------------
-        let mut data: Vec<f32> = Vec::new();
-        for d in l_r.iter() {
-            data.push(d[0]);
-            data.push(d[1]);
-        }
-        let mut processor = MultiChannelProcessor {
-            data,
-            sampling_rate: sampling_rate as f32,
-            plugins: vec![
-                Plugin::Lowpass(Lowpass::new(4000.0, 5000.0))
-            ],
-            channel_count: channel_count as usize,
-        };
-        processor.process();
-        let out = seperate_channels(&processor.data, channel_count as usize);
-        let mut l_r_g: Vec<[f32; 2]> = Vec::new();
-        for i in 0..out[0].len() {
-            l_r_g.push([
-                out[0][i],
-                out[1][i],
-            ]);
-        }
-
-        // calc points out of left and right channel
-        let mut points: Vec<[f32; 2]> = Vec::new();
-        for l_r in l_r_g.iter() {
-            let p1 = l_r[0];
-            let p2 = l_r[1];
-            points.push([p1 * 0.9 + 0.5, p2 * -0.9 + 0.5]);
-        }
-
-        // actual drawing using macroquad
-        // lines
-        let mut line_points = points.iter().peekable();
-        loop {
-            if let Some(p0) =  line_points.next() {
-                if let Some(p1) = line_points.peek() {
-                    draw_line(
-                        p0[0] * width,
-                        p0[1] * height,
-                        p1[0] * width,
-                        p1[1] * height,
-                        thickness,
-                        Color::from_rgba(255, 0, 100, 200)
-                    )
-                } else {
-                    break
-                }
-            } else {
-                break
-            }
-        }
-
-        // points
-        for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(225, 0, 255, 127));
-        }
-
-        // -------------
         //     BASS
         // -------------
         let mut data: Vec<f32> = Vec::new();
@@ -197,8 +136,70 @@ async fn main() {
         }
         // points
         for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(0, 112, 255, 255));
+            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(0, 112, 255, 200));
         }
+
+        // -------------
+        //     Mids 
+        // -------------
+        let mut data: Vec<f32> = Vec::new();
+        for d in l_r.iter() {
+            data.push(d[0]);
+            data.push(d[1]);
+        }
+        let mut processor = MultiChannelProcessor {
+            data,
+            sampling_rate: sampling_rate as f32,
+            plugins: vec![
+                // Plugin::Lowpass(Lowpass::new(4000.0, 5000.0))
+                Plugin::Bandpass(Bandpass::new(300.0, 500.0, 4000.0, 5000.0))
+            ],
+            channel_count: channel_count as usize,
+        };
+        processor.process();
+        let out = seperate_channels(&processor.data, channel_count as usize);
+        let mut l_r_g: Vec<[f32; 2]> = Vec::new();
+        for i in 0..out[0].len() {
+            l_r_g.push([
+                out[0][i],
+                out[1][i],
+            ]);
+        }
+
+        // calc points out of left and right channel
+        let mut points: Vec<[f32; 2]> = Vec::new();
+        for l_r in l_r_g.iter() {
+            let p1 = l_r[0];
+            let p2 = l_r[1];
+            points.push([p1 * 0.9 + 0.5, p2 * -0.9 + 0.5]);
+        }
+
+        // actual drawing using macroquad
+        // lines
+        let mut line_points = points.iter().peekable();
+        loop {
+            if let Some(p0) =  line_points.next() {
+                if let Some(p1) = line_points.peek() {
+                    draw_line(
+                        p0[0] * width,
+                        p0[1] * height,
+                        p1[0] * width,
+                        p1[1] * height,
+                        thickness,
+                        Color::from_rgba(255, 0, 100, 120)
+                    )
+                } else {
+                    break
+                }
+            } else {
+                break
+            }
+        }
+
+        // // points
+        // for point in points.iter() {
+        //     draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(225, 0, 255, 150));
+        // }
 
         // -------------
         //    Treble 
@@ -242,7 +243,7 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(0, 255, 55, 100)
+                        Color::from_rgba(0, 255, 55, 50)
                     )
                 } else {
                     break
