@@ -20,7 +20,7 @@ async fn main() {
 
     let stream_config: StreamConfig = StreamConfig {
         channel_count: channel_count,
-        gravity: Some(5.0),
+        gravity: Some(2.0),
         fft_resolution: 1024 * 4,
         processor: ProcessorConfig {
             frequency_bounds: [50, 20_000],

@@ -136,7 +136,7 @@ async fn main() {
         }
         // points
         for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(0, 112, 255, 200));
+            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(10, 80, 255, 200));
         }
 
         // -------------
@@ -186,7 +186,7 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(255, 0, 100, 120)
+                        Color::from_rgba(225, 0, 255, 150)
                     )
                 } else {
                     break
@@ -195,11 +195,6 @@ async fn main() {
                 break
             }
         }
-
-        // // points
-        // for point in points.iter() {
-        //     draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(225, 0, 255, 150));
-        // }
 
         // -------------
         //    Treble 
@@ -243,7 +238,7 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(0, 255, 55, 50)
+                        Color::from_rgba(0, 255, 55, 40)
                     )
                 } else {
                     break

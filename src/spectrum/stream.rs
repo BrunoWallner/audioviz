@@ -35,21 +35,22 @@ impl Stream {
     pub fn new(config: StreamConfig) -> Self {
         let cap: usize = config.fft_resolution;
         Self {
-            config,
-            raw_buffer: Vec::with_capacity(cap),
-            freq_buffer: Vec::with_capacity(cap),
+            config: config.clone(),
+            raw_buffer: vec![vec![]; config.channel_count as usize],
+            freq_buffer: Vec::new(),
             gravity_time_buffer: Vec::with_capacity(cap),
         }
     }
     pub fn push_data(&mut self, data: Vec<f32>) {
-        //self.raw_buffer.append(&mut data);
-        let channels: usize = self.config.channel_count as usize;
-        if self.raw_buffer.len() != channels {
-            self.raw_buffer = vec![vec![]; channels];
-        }
-        for (channel, data) in seperate_channels(&data, channels).iter().enumerate() {
+        for (channel, data) in seperate_channels(&data, self.config.channel_count as usize).iter().enumerate() {
             let data = &mut data.clone();
             self.raw_buffer[channel].append(data);
+            // clear
+            let len = self.raw_buffer[channel].len();
+            if len > self.config.fft_resolution * 2 {
+                let end: usize = len - (len as f32 * 0.5) as usize;
+                self.raw_buffer[channel].drain(0..end);
+            }
         }
     }
     pub fn get_frequencies(&mut self) -> Vec<Vec<Frequency>> {
@@ -78,17 +79,12 @@ impl Stream {
         let channels: usize = self.config.channel_count as usize;
         for (channel, raw_data) in self.raw_buffer.iter_mut().enumerate() {
             /* Prcesses data using spectralizer::Processor */
-            let fft_res: usize = self.config.fft_resolution;
-
-            if raw_data.len() > fft_res {
-                // clears unimportant buffer values that should already be processed
-                // and thus reduce latency
-                let diff = raw_data.len() - fft_res;
-                raw_data.drain(..diff);
-    
+            if raw_data.len() > self.config.fft_resolution {
+                // processes data with same size every time
+                let diff = raw_data.len() - self.config.fft_resolution;
                 let mut audio_data = Processor::from_raw_data(
                     self.config.clone().processor,
-                    raw_data[..].to_vec(),
+                    raw_data[diff..].to_vec(),
                 );
                 audio_data.apodize();
                 audio_data.fft();
