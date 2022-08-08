@@ -40,17 +40,14 @@ async fn main() {
         
         let frequencies: Vec<Vec<Frequency>> = stream.get_frequencies();
         let frequencies: Vec<Frequency> = if frequencies.len() >= 2 {
-        let mut buf: Vec<Frequency> = Vec::new();
-
-        // left
-        let mut left = frequencies[0].clone();
-        left.reverse();
-        buf.append(&mut left);
-
-        // right
-        buf.append(&mut frequencies[1].clone());
-
-        buf
+            let mut buf: Vec<Frequency> = Vec::new();
+            // left
+            let mut left = frequencies[0].clone();
+            left.reverse();
+            buf.append(&mut left);
+            // right
+            buf.append(&mut frequencies[1].clone());
+            buf
         } else {
             if frequencies.len() == 1 {
                 frequencies[0].clone()
