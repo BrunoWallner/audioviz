@@ -32,6 +32,8 @@ pub struct Processor {
     config: ProcessorConfig,
     pub raw_buffer: Vec<f32>,
     pub freq_buffer: Vec<Frequency>,
+    // only usefull for cubic interpolation,
+    reserved_bass_freq: Frequency,
 }
 
 impl Processor {
@@ -41,6 +43,7 @@ impl Processor {
             config,
             raw_buffer: data,
             freq_buffer: Vec::with_capacity(freq_buf_cap),
+            reserved_bass_freq: Frequency::empty(),
         }
     }
     pub fn from_frequencies(config: ProcessorConfig, freqs: Vec<Frequency>) -> Self {
@@ -48,6 +51,7 @@ impl Processor {
             config,
             raw_buffer: Vec::new(),
             freq_buffer: freqs,
+            reserved_bass_freq: Frequency::empty(),
         }
     }
 
@@ -77,6 +81,7 @@ impl Processor {
         let fft = fft::forward(&self.raw_buffer);
         let fft = fft::normalize(&fft);
         let fft = fft::remove_mirroring(&fft);
+        self.reserved_bass_freq.volume = *fft.get(0).unwrap_or(&0.0);
         self.raw_buffer = fft;
     }
 
@@ -105,6 +110,7 @@ impl Processor {
                 } 
             }
         }
+        self.reserved_bass_freq.volume = *self.raw_buffer.get(0).unwrap_or(&0.0);
     }
 
     /// manual position distribution on `freq_buffer`
@@ -284,7 +290,7 @@ impl Processor {
 
                 let mut fb = self.freq_buffer.clone();
 
-                fb.insert(0, Frequency::empty());
+                fb.insert(0, self.reserved_bass_freq.clone());
                 fb.push( Frequency::empty() );
 
                 if fb.len() > 4 {
@@ -386,6 +392,10 @@ impl Processor {
             }
 
             self.freq_buffer = bound_buff;
+        }
+        if start >= 1 {
+            self.reserved_bass_freq = self.freq_buffer[start-1].clone();
+            self.reserved_bass_freq.position = 0.0;
         }
     }
 }
