@@ -115,8 +115,8 @@ pub struct ProcessorConfig {
     /// applies positions of frequencies
     pub interpolation: Interpolation,
 }
-impl Default for ProcessorConfig {
-    fn default() -> Self {
+impl ProcessorConfig {
+    pub const fn default() -> Self {
         ProcessorConfig {
             sampling_rate: 44_100,
             frequency_bounds: [50, 20000],
@@ -145,8 +145,8 @@ pub struct StreamConfig {
 
     pub gravity: Option<f32>,
 }
-impl Default for StreamConfig {
-    fn default() -> Self {
+impl StreamConfig {
+    pub const fn default() -> Self {
         StreamConfig {
             channel_count: 2,
             processor: ProcessorConfig::default(),
