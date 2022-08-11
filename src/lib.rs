@@ -34,6 +34,9 @@
 #[cfg(feature = "spectrum")]
 pub mod spectrum;
 
+#[cfg(feature = "lissajous")]
+pub mod lissajous;
+
 #[cfg(feature = "cpal")]
 pub mod io;
 

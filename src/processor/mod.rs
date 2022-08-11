@@ -6,7 +6,7 @@ pub struct Lowpass {
     pub cutoff_start_freq: f32,
     pub cutoff_end_freq: f32,
 } impl Lowpass {
-    pub fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
+    pub const fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
         Self {
             cutoff_start_freq,
             cutoff_end_freq
@@ -19,7 +19,7 @@ pub struct Highpass {
     pub cutoff_start_freq: f32,
     pub cutoff_end_freq: f32,
 } impl Highpass {
-    pub fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
+    pub const fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
         Self {
             cutoff_start_freq,
             cutoff_end_freq
@@ -34,7 +34,7 @@ pub struct Bandpass {
     pub high_cutoff_start_freq: f32,
     pub high_cutoff_end_freq: f32,
 } impl Bandpass {
-    pub fn new(
+    pub const fn new(
         low_cutoff_start_freq: f32,
         low_cutoff_end_freq: f32,
         high_cutoff_start_freq: f32,
