@@ -26,9 +26,9 @@ async fn main() {
             frequency_bounds: [50, 20_000],
             interpolation: Interpolation::Step,
             volume: 0.1,
-            ..Default::default()
+            ..ProcessorConfig::default()
         },
-        ..Default::default()
+        ..StreamConfig::default()
     };
     let mut stream: Stream = Stream::new(stream_config);
     loop {
