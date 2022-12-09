@@ -9,34 +9,22 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use log::warn;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc;
 
-use super::converter;
 use super::super::Device;
 use super::super::Error;
+use super::converter;
 
-#[derive(Clone)]
 pub struct InputController {
-    data: Arc<Mutex<Vec<f32>>>,
+    receiver: mpsc::Receiver<Vec<f32>>,
 }
 impl InputController {
-    pub fn pull_data(&self) -> Option<Vec<f32>> {
-        let mut d = self.get_data();
-        let out = d.drain(..).as_slice().to_vec();
-        if out.is_empty() {
-            None
-        } else {
-            Some(out)
+    pub fn pull_data(&self) -> Vec<f32> {
+        let mut data = Vec::new();
+        while let Ok(mut d) = self.receiver.try_recv() {
+            data.append(&mut d);
         }
-    }
-
-    // internal use only
-    fn get_data(&self) -> MutexGuard<'_, Vec<f32>> {
-        self.data.lock().unwrap()
-    }
-    fn append_data(&self, data: &[f32]) {
-        let mut d = self.get_data();
-        d.append(&mut data.to_vec());
+        data
     }
 }
 
@@ -46,24 +34,21 @@ pub struct Input {
     stream: Option<cpal::Stream>,
 }
 impl Input {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         let host = cpal::default_host();
 
-        return Self {
-            host,
-            stream: None,
-        }
+        return Self { host, stream: None };
     }
     /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
     pub fn init(&mut self, device: &Device) -> Result<(u16, u32, InputController), Error> {
-        let input_controller = InputController{
-            data: Arc::new(Mutex::new(Vec::new()))
-        };
+        let (sender, receiver) = mpsc::channel();
+        let input_controller = InputController { receiver };
 
-        let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, input_controller.clone(), device) {
-            Ok(s) => s,
-            Err(e) => return Err(e),
-        };
+        let (channel_count, stream, sampling_rate) =
+            match stream_audio_to_distributor(&self.host, sender, device) {
+                Ok(s) => s,
+                Err(e) => return Err(e),
+            };
 
         self.stream = Some(stream);
 
@@ -91,7 +76,7 @@ impl Input {
 
 fn stream_audio_to_distributor(
     host: &cpal::platform::Host,
-   input_controller: InputController,
+    sender: mpsc::Sender<Vec<f32>>,
     device: &Device,
     // returns channel-count, stream and sampling-rate
 ) -> Result<(u16, cpal::Stream, u32), Error> {
@@ -126,7 +111,7 @@ fn stream_audio_to_distributor(
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             move |data: &[f32], _: &_| {
-                input_controller.append_data(data);
+                let _ = sender.send(data.to_vec());
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
@@ -134,7 +119,7 @@ fn stream_audio_to_distributor(
             &config.into(),
             move |data: &[i16], _: &_| {
                 let data = converter::i16_to_f32(data);
-                input_controller.append_data(&data);
+                let _ = sender.send(data);
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
@@ -142,7 +127,7 @@ fn stream_audio_to_distributor(
             &config.into(),
             move |data: &[u16], _: &_| {
                 let data = converter::u16_to_f32(data);
-                input_controller.append_data(&data);
+                let _ = sender.send(data);
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),

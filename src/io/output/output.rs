@@ -12,13 +12,13 @@ impl<T, E> Anyway for Result<T, E> {
     fn anyway(&self) -> Result<(), ()> {
         match self {
             Ok(_) => Ok(()),
-            Err(_) => Err(())
+            Err(_) => Err(()),
         }
     }
 }
 
-use super::super::Error;
 use super::super::Device;
+use super::super::Error;
 
 #[derive(Clone)]
 pub struct OutputController {
@@ -40,24 +40,22 @@ pub struct Output {
     stream: Option<cpal::Stream>,
 }
 impl Output {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         let host = cpal::default_host();
 
-        return Self {
-            host,
-            stream: None,
-        }
+        return Self { host, stream: None };
     }
     /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
     pub fn init(&mut self, device: &Device) -> Result<(u16, u32, OutputController), Error> {
-        let output_controller = OutputController{
-            data: Arc::new(Mutex::new(Vec::new()))
+        let output_controller = OutputController {
+            data: Arc::new(Mutex::new(Vec::new())),
         };
 
-        let (channel_count, stream, sampling_rate) = match stream_audio_to_distributor(&self.host, output_controller.clone(), device) {
-            Ok(s) => s,
-            Err(e) => return Err(e),
-        };
+        let (channel_count, stream, sampling_rate) =
+            match stream_audio_to_distributor(&self.host, output_controller.clone(), device) {
+                Ok(s) => s,
+                Err(e) => return Err(e),
+            };
 
         self.stream = Some(stream);
 
@@ -131,7 +129,7 @@ fn stream_audio_to_distributor(
             },
             |e| warn!("error occurred on capture-stream: {}", e),
         ),
-        _ => return Err(Error::UnsupportedConfig)
+        _ => return Err(Error::UnsupportedConfig),
     };
 
     let stream = match stream {
