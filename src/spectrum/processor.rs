@@ -3,25 +3,25 @@
 //! use audioviz::spectrum::config::ProcessorConfig;
 //! use audioviz::spectrum::processor::Processor;
 //! use audioviz::spectrum::Frequency;
-//! 
+//!
 //! // sample rate must be known and only one channel processing is supported
 //! let data = vec![0.0, 1.0, 0.0, 0.5, -1.0, 0.043];
-//! 
+//!
 //! let mut processor = Processor::from_raw_data(
 //!     ProcessorConfig::default(), // make sure that sampling_rate is correct, default is 44_100hz
 //!     data
 //! );
 //! processor.compute_all();
-//! 
+//!
 //! let frequencies: Vec<Frequency> = processor.freq_buffer;
-//! 
+//!
 //! println!("{:#?}", frequencies);
 //! ```
 
 use splines::{Interpolation, Key, Spline};
 
 use crate::spectrum::config::Interpolation as ConfigInterpolation;
-use crate::spectrum::config::{ProcessorConfig, VolumeNormalisation, PositionNormalisation};
+use crate::spectrum::config::{PositionNormalisation, ProcessorConfig, VolumeNormalisation};
 use crate::{fft, utils::apodize};
 
 use crate::spectrum::Frequency;
@@ -68,12 +68,11 @@ impl Processor {
         self.interpolate();
     }
 
-
     /// applies hanning windowing to `raw_buffer`
-    /// 
+    ///
     /// this removes noise
     pub fn apodize(&mut self) {
-        apodize(&mut self.raw_buffer)
+        self.raw_buffer = apodize(&self.raw_buffer)
     }
 
     /// processes fft algorithm on `raw_buffer`
@@ -92,7 +91,7 @@ impl Processor {
                 for i in 0..self.raw_buffer.len() {
                     self.raw_buffer[i] *= 0.01;
                 }
-            },
+            }
             VolumeNormalisation::Exponential => {
                 for i in 0..self.raw_buffer.len() {
                     let percentage = (i + 1) as f32 / self.raw_buffer.len() as f32;
@@ -114,7 +113,7 @@ impl Processor {
                     let exp: f32 = percentage.sqrt();
                     self.raw_buffer[i] *= (log + exp) / 2.0;
                     self.raw_buffer[i] *= 0.1;
-                } 
+                }
             }
         }
         self.reserved_bass_freq.volume = *self.raw_buffer.get(0).unwrap_or(&0.0);
@@ -180,7 +179,7 @@ impl Processor {
             PositionNormalisation::Exponential => {
                 for freq in self.freq_buffer.iter_mut() {
                     freq.position = freq.position.sqrt();
-                } 
+                }
             }
             PositionNormalisation::Harmonic => {
                 let mut pos: f32 = 0.0;
@@ -192,7 +191,7 @@ impl Processor {
                 // last freq must have position of 1.0
                 let max_pos = match self.freq_buffer.last() {
                     Some(f) => f.position,
-                    None => 1.0
+                    None => 1.0,
                 };
                 for freq in self.freq_buffer.iter_mut() {
                     freq.position *= 1.0 / max_pos;
@@ -202,7 +201,7 @@ impl Processor {
     }
 
     /// applies the position of frequencies in `freq_buffer`
-    /// 
+    ///
     /// interpolates the gaps and applies resolution
     pub fn interpolate(&mut self) {
         let resolution = match self.config.resolution {
@@ -271,7 +270,9 @@ impl Processor {
                             let pos: usize = i - start;
                             let gap_size = end - start;
                             let mut percentage: f32 = pos as f32 / gap_size as f32;
-                            if percentage.is_nan() {percentage = 0.5}
+                            if percentage.is_nan() {
+                                percentage = 0.5
+                            }
 
                             // interpolation
                             let volume: f32 = (start_freq.volume * (1.0 - percentage))
@@ -283,7 +284,7 @@ impl Processor {
                             if o_buf.len() > i && o_buf[i].volume < volume {
                                 o_buf[i] = Frequency {
                                     volume,
-                                    position: 0.0, // unneccessary 
+                                    position: 0.0, // unneccessary
                                     freq,
                                 };
                             }
@@ -298,47 +299,49 @@ impl Processor {
                 let mut fb = self.freq_buffer.clone();
 
                 fb.insert(0, self.reserved_bass_freq.clone());
-                fb.push( Frequency::empty() );
+                fb.push(Frequency::empty());
 
                 if fb.len() > 4 {
                     for i in 0..fb.len() - 3 {
                         let y0 = fb[i].volume;
-                        let y1 = fb[i+1].volume;
-                        let y2 = fb[i+2].volume;
-                        let y3 = fb[i+3].volume;
-    
-                        let start = ( fb[i+1].position * o_buf.len() as f32 ) as usize;
-                        let end = ( fb[i+2].position * o_buf.len() as f32 ) as usize;
-    
+                        let y1 = fb[i + 1].volume;
+                        let y2 = fb[i + 2].volume;
+                        let y3 = fb[i + 3].volume;
+
+                        let start = (fb[i + 1].position * o_buf.len() as f32) as usize;
+                        let end = (fb[i + 2].position * o_buf.len() as f32) as usize;
+
                         if start < resolution && end < resolution {
                             for j in start..=end {
                                 let pos: usize = j - start;
                                 let gap_size = end - start;
                                 let mut percentage: f32 = pos as f32 / gap_size as f32;
-                                if percentage.is_nan() {percentage = 0.5}
-    
+                                if percentage.is_nan() {
+                                    percentage = 0.5
+                                }
+
                                 let t = percentage;
                                 let t2 = percentage.powi(2);
-    
+
                                 // explanation: http://paulbourke.net/miscellaneous/interpolation/
                                 // cubic volume interpolation
                                 let a0 = y3 - y2 - y0 + y1;
-                                let a1  = y0 - y1 - a0;
+                                let a1 = y0 - y1 - a0;
                                 let a2 = y2 - y0;
                                 let a3 = y1;
-    
+
                                 // math magic
                                 let volume = a0 * t * t2 + a1 * t2 + a2 * t + a3;
 
                                 // linear freq interpolation
-                                let f1 = fb[i+1].freq;
-                                let f2 = fb[i+2].freq;
+                                let f1 = fb[i + 1].freq;
+                                let f2 = fb[i + 2].freq;
                                 let freq = f1 * (1.0 - t) + f2 * t;
-    
+
                                 if o_buf.len() > j && o_buf[j].volume < volume {
                                     o_buf[j] = Frequency {
                                         volume,
-                                        position: 0.0, // unneccessary 
+                                        position: 0.0, // unneccessary
                                         freq,
                                     };
                                 }
@@ -401,7 +404,7 @@ impl Processor {
             self.freq_buffer = bound_buff;
         }
         if start >= 1 {
-            self.reserved_bass_freq = self.freq_buffer[start-1].clone();
+            self.reserved_bass_freq = self.freq_buffer[start - 1].clone();
             self.reserved_bass_freq.position = 0.0;
         }
     }

@@ -3,7 +3,8 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use log::warn;
-use std::sync::{Arc, Mutex, MutexGuard};
+// use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc;
 
 pub trait Anyway {
     fn anyway(&self) -> Result<(), ()>;
@@ -22,15 +23,14 @@ use super::super::Error;
 
 #[derive(Clone)]
 pub struct OutputController {
-    data: Arc<Mutex<Vec<f32>>>,
+    // data: Arc<Mutex<Vec<f32>>>,
+    sender: mpsc::Sender<f32>,
 }
 impl OutputController {
     pub fn push_data(&self, data: Vec<f32>) {
-        let mut d = self.get_data();
-        d.append(&mut data.clone());
-    }
-    fn get_data(&self) -> MutexGuard<'_, Vec<f32>> {
-        self.data.lock().unwrap()
+        for d in data {
+            let _ = self.sender.send(d);
+        }
     }
 }
 
@@ -47,12 +47,11 @@ impl Output {
     }
     /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
     pub fn init(&mut self, device: &Device) -> Result<(u16, u32, OutputController), Error> {
-        let output_controller = OutputController {
-            data: Arc::new(Mutex::new(Vec::new())),
-        };
+        let (sender, receiver) = mpsc::channel();
+        let output_controller = OutputController { sender };
 
         let (channel_count, stream, sampling_rate) =
-            match stream_audio_to_distributor(&self.host, output_controller.clone(), device) {
+            match stream_audio_to_distributor(&self.host, receiver, device) {
                 Ok(s) => s,
                 Err(e) => return Err(e),
             };
@@ -83,7 +82,7 @@ impl Output {
 
 fn stream_audio_to_distributor(
     host: &cpal::platform::Host,
-    output_controller: OutputController,
+    receiver: mpsc::Receiver<f32>,
     device: &Device,
     // returns channel-count, stream and sampling-rate
 ) -> Result<(u16, cpal::Stream, u32), Error> {
@@ -118,12 +117,11 @@ fn stream_audio_to_distributor(
         cpal::SampleFormat::F32 => device.build_output_stream(
             &config.into(),
             move |data: &mut [f32], _: &_| {
-                let mut controller_data = output_controller.get_data();
                 for sample in data {
-                    if controller_data.len() > 0 {
-                        *sample = controller_data.remove(0);
+                    if let Ok(data) = receiver.try_recv() {
+                        *sample = data;
                     } else {
-                        break;
+                        *sample = 0.0;
                     }
                 }
             },

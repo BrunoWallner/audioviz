@@ -16,7 +16,7 @@ io = ["std", "cpal"]
 spectrum = ["fft", "apodize", "splines"]
 lissajous = []
 fft = ["rustfft"]
-processor = ["fft"]
+processor = ["fft", "apodize"]
 std = []
 
 [dependencies]
