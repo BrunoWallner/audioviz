@@ -26,6 +26,17 @@ impl InputController {
         }
         data
     }
+
+    pub fn pull_data_blocking(&self) -> Vec<f32> {
+        let mut data = Vec::new();
+        if let Ok(mut blocking_data) = self.receiver.recv() {
+            data.append(&mut blocking_data);
+        }
+        let mut non_blocking_data = self.pull_data();
+        data.append(&mut non_blocking_data);
+
+        data
+    }
 }
 
 pub struct Input {
