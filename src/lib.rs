@@ -17,7 +17,7 @@
 //! let (channel_count, sampling_rate, input_controller) = audio_input.init(&Device::DefaultInput).unwrap();
 //!
 //! // spectrum visualizer stream
-//! let mut stream: Stream = Stream::new(StreamConfig::default()); 
+//! let mut stream: Stream = Stream::new(StreamConfig::default());
 //! loop {
 //!     if let Some(data) = input_controller.pull_data() {
 //!         stream.push_data(data);
@@ -50,24 +50,16 @@ pub mod utils;
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
     use std::path::Path;
-    
-    #[cfg(feature = "distributor")]
-    use crate::distributor::Distributor;
+    use std::process::Command;
 
     #[cfg(feature = "fft")]
     use crate::fft;
 
     #[test]
     // will run cargo check for every example
-    fn check_examples() {        
-        let examples: &[&str] = &[
-            "audio_scope",
-            "audio_spectrum",
-            "device_selector",
-            "osc",
-        ];
+    fn check_examples() {
+        let examples: &[&str] = &["audio_scope", "audio_spectrum", "device_selector", "osc"];
 
         for example in examples {
             let path = Path::new("examples").join(example);
@@ -77,7 +69,7 @@ mod tests {
                 .arg("--quiet")
                 .status()
                 .unwrap();
-            assert!(command.success(), "failed at {} example", example);    
+            assert!(command.success(), "failed at {} example", example);
         }
     }
 
@@ -91,26 +83,17 @@ mod tests {
             buffer.push(x.sin());
             x += 0.1;
         }
-    
+
         let fft = fft::forward(&buffer);
         let fft = fft::normalize(&fft);
         let fft = fft::remove_mirroring(&fft);
-    
+
         assert_eq!(
             fft,
             vec![
-                9.78363,
-                2.9537609,
-                1.4024371,
-                0.95359206,
-                0.74589825,
-                0.63307375,
-                0.569189,
-                0.5359103,
-                0.52553797    
+                9.78363, 2.9537609, 1.4024371, 0.95359206, 0.74589825, 0.63307375, 0.569189,
+                0.5359103, 0.52553797
             ]
         )
     }
-
-
 }

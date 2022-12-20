@@ -1,7 +1,7 @@
-use audioviz::io::{Input, InputController};
 use audioviz::io::Device;
+use audioviz::io::{Input, InputController};
+use audioviz::processor::{Bandpass, Highpass, Lowpass, MultiChannelProcessor, Plugin};
 use audioviz::utils::seperate_channels;
-use audioviz::processor::{MultiChannelProcessor, Plugin, Lowpass, Highpass, Bandpass};
 
 use macroquad::prelude::*;
 
@@ -32,7 +32,8 @@ impl Data {
         assert_eq!(self.l_buffer.len(), self.r_buffer.len());
 
         // clear buffer
-        let end: usize = self.l_buffer.len() - (self.l_buffer.len() as f32 * OVERLAP_PERCENTAGE) as usize;
+        let end: usize =
+            self.l_buffer.len() - (self.l_buffer.len() as f32 * OVERLAP_PERCENTAGE) as usize;
         self.l_buffer.drain(0..end);
         self.r_buffer.drain(0..end);
 
@@ -47,20 +48,14 @@ impl Data {
             let out = if self.channel_count >= 2 {
                 seperate_channels(&data, self.channel_count)
             } else {
-                vec![
-                    data.clone(),
-                    data.clone()
-                ]
+                vec![data.clone(), data.clone()]
             };
 
             self.l_buffer.append(&mut out[0].clone());
             self.r_buffer.append(&mut out[1].clone());
         }
 
-        let mut out = [
-            self.l_buffer.clone(),
-            self.r_buffer.clone(),
-        ];
+        let mut out = [self.l_buffer.clone(), self.r_buffer.clone()];
 
         // apply offset
         let offset = (OFFSET_PERCENTAGE * out[0].len() as f32).floor() as usize;
@@ -73,10 +68,7 @@ impl Data {
 
         let mut combined: Vec<[f32; 2]> = Vec::new();
         for i in 0..out[0].len() {
-            combined.push([
-                out[0][i],
-                out[1][i],
-            ]);
+            combined.push([out[0][i], out[1][i]]);
         }
 
         combined
@@ -93,7 +85,8 @@ async fn main() {
         println!("{id}\t{device}");
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
-    let (channel_count, sampling_rate, input_controller) = audio_input.init(&Device::Id(id)).unwrap();
+    let (channel_count, sampling_rate, input_controller) =
+        audio_input.init(&Device::Id(id)).unwrap();
 
     let mut data = Data::new(input_controller, channel_count as usize);
     loop {
@@ -113,19 +106,14 @@ async fn main() {
         let mut processor = MultiChannelProcessor {
             data,
             sampling_rate: sampling_rate as f32,
-            plugins: vec![
-                Plugin::Lowpass(Lowpass::new(300.0, 500.0))
-            ],
+            plugins: vec![Plugin::Lowpass(Lowpass::new(300.0, 500.0))],
             channel_count: channel_count as usize,
         };
         processor.process();
         let out = seperate_channels(&processor.data, channel_count as usize);
         let mut l_r_b: Vec<[f32; 2]> = Vec::new();
         for i in 0..out[0].len() {
-            l_r_b.push([
-                out[0][i],
-                out[1][i],
-            ]);
+            l_r_b.push([out[0][i], out[1][i]]);
         }
 
         let mut points: Vec<[f32; 2]> = Vec::new();
@@ -136,11 +124,16 @@ async fn main() {
         }
         // points
         for point in points.iter() {
-            draw_circle(point[0] * width, point[1] * height, thickness * 1.5, Color::from_rgba(10, 80, 255, 200));
+            draw_circle(
+                point[0] * width,
+                point[1] * height,
+                thickness * 1.5,
+                Color::from_rgba(10, 80, 255, 200),
+            );
         }
 
         // -------------
-        //     Mids 
+        //     Mids
         // -------------
         let mut data: Vec<f32> = Vec::new();
         for d in l_r.iter() {
@@ -152,7 +145,7 @@ async fn main() {
             sampling_rate: sampling_rate as f32,
             plugins: vec![
                 // Plugin::Lowpass(Lowpass::new(4000.0, 5000.0))
-                Plugin::Bandpass(Bandpass::new(300.0, 500.0, 4000.0, 5000.0))
+                Plugin::Bandpass(Bandpass::new(300.0, 500.0, 4000.0, 5000.0)),
             ],
             channel_count: channel_count as usize,
         };
@@ -160,10 +153,7 @@ async fn main() {
         let out = seperate_channels(&processor.data, channel_count as usize);
         let mut l_r_g: Vec<[f32; 2]> = Vec::new();
         for i in 0..out[0].len() {
-            l_r_g.push([
-                out[0][i],
-                out[1][i],
-            ]);
+            l_r_g.push([out[0][i], out[1][i]]);
         }
 
         // calc points out of left and right channel
@@ -178,7 +168,7 @@ async fn main() {
         // lines
         let mut line_points = points.iter().peekable();
         loop {
-            if let Some(p0) =  line_points.next() {
+            if let Some(p0) = line_points.next() {
                 if let Some(p1) = line_points.peek() {
                     draw_line(
                         p0[0] * width,
@@ -186,18 +176,18 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(225, 0, 255, 150)
+                        Color::from_rgba(225, 0, 255, 150),
                     )
                 } else {
-                    break
+                    break;
                 }
             } else {
-                break
+                break;
             }
         }
 
         // -------------
-        //    Treble 
+        //    Treble
         // -------------
         let mut data: Vec<f32> = Vec::new();
         for d in l_r.iter() {
@@ -207,19 +197,14 @@ async fn main() {
         let mut processor = MultiChannelProcessor {
             data,
             sampling_rate: sampling_rate as f32,
-            plugins: vec![
-                Plugin::Highpass(Highpass::new(4000.0, 3500.0))
-            ],
+            plugins: vec![Plugin::Highpass(Highpass::new(4000.0, 3500.0))],
             channel_count: channel_count as usize,
         };
         processor.process();
         let out = seperate_channels(&processor.data, channel_count as usize);
         let mut l_r_t: Vec<[f32; 2]> = Vec::new();
         for i in 0..out[0].len() {
-            l_r_t.push([
-                out[0][i],
-                out[1][i],
-            ]);
+            l_r_t.push([out[0][i], out[1][i]]);
         }
 
         let mut points: Vec<[f32; 2]> = Vec::new();
@@ -230,7 +215,7 @@ async fn main() {
         }
         let mut line_points = points.iter().peekable();
         loop {
-            if let Some(p0) =  line_points.next() {
+            if let Some(p0) = line_points.next() {
                 if let Some(p1) = line_points.peek() {
                     draw_line(
                         p0[0] * width,
@@ -238,13 +223,13 @@ async fn main() {
                         p1[0] * width,
                         p1[1] * height,
                         thickness,
-                        Color::from_rgba(0, 255, 55, 40)
+                        Color::from_rgba(0, 255, 55, 40),
                     )
                 } else {
-                    break
+                    break;
                 }
             } else {
-                break
+                break;
             }
         }
 
@@ -259,9 +244,10 @@ fn input(print: &str) -> String {
     std::io::stdout().flush().unwrap();
     let mut input = String::new();
 
-    std::io::stdin().read_line(&mut input)
+    std::io::stdin()
+        .read_line(&mut input)
         .ok()
         .expect("Couldn't read line");
-        
+
     input.trim().to_string()
 }

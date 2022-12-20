@@ -1,15 +1,16 @@
 pub mod filter;
-use filter::{lowpass_filter, highpass_filter, bandpass_filter};
+use filter::{bandpass_filter, highpass_filter, lowpass_filter};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Lowpass {
     pub cutoff_start_freq: f32,
     pub cutoff_end_freq: f32,
-} impl Lowpass {
+}
+impl Lowpass {
     pub const fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
         Self {
             cutoff_start_freq,
-            cutoff_end_freq
+            cutoff_end_freq,
         }
     }
 }
@@ -18,11 +19,12 @@ pub struct Lowpass {
 pub struct Highpass {
     pub cutoff_start_freq: f32,
     pub cutoff_end_freq: f32,
-} impl Highpass {
+}
+impl Highpass {
     pub const fn new(cutoff_start_freq: f32, cutoff_end_freq: f32) -> Self {
         Self {
             cutoff_start_freq,
-            cutoff_end_freq
+            cutoff_end_freq,
         }
     }
 }
@@ -33,18 +35,19 @@ pub struct Bandpass {
     pub low_cutoff_end_freq: f32,
     pub high_cutoff_start_freq: f32,
     pub high_cutoff_end_freq: f32,
-} impl Bandpass {
+}
+impl Bandpass {
     pub const fn new(
         low_cutoff_start_freq: f32,
         low_cutoff_end_freq: f32,
         high_cutoff_start_freq: f32,
-        high_cutoff_end_freq: f32
+        high_cutoff_end_freq: f32,
     ) -> Self {
         Self {
             low_cutoff_start_freq,
             low_cutoff_end_freq,
             high_cutoff_start_freq,
-            high_cutoff_end_freq
+            high_cutoff_end_freq,
         }
     }
 }
@@ -53,7 +56,7 @@ pub struct Bandpass {
 pub enum Plugin {
     Lowpass(Lowpass),
     Highpass(Highpass),
-    Bandpass(Bandpass)
+    Bandpass(Bandpass),
 }
 
 /// data must be single channel only
@@ -67,14 +70,24 @@ impl Processor {
         for plugin in self.plugins.iter() {
             match plugin {
                 Plugin::Lowpass(lowpass) => {
-                    self.data = lowpass_filter(&self.data, self.sampling_rate, lowpass.cutoff_start_freq, lowpass.cutoff_end_freq)
-                },
+                    self.data = lowpass_filter(
+                        &self.data,
+                        self.sampling_rate,
+                        lowpass.cutoff_start_freq,
+                        lowpass.cutoff_end_freq,
+                    )
+                }
                 Plugin::Highpass(highpass) => {
-                    self.data = highpass_filter(&self.data, self.sampling_rate, highpass.cutoff_start_freq, highpass.cutoff_end_freq)
-                },
+                    self.data = highpass_filter(
+                        &self.data,
+                        self.sampling_rate,
+                        highpass.cutoff_start_freq,
+                        highpass.cutoff_end_freq,
+                    )
+                }
                 Plugin::Bandpass(bandpass) => {
                     self.data = bandpass_filter(
-                        &self.data, 
+                        &self.data,
                         self.sampling_rate,
                         bandpass.low_cutoff_start_freq,
                         bandpass.low_cutoff_end_freq,
@@ -87,7 +100,7 @@ impl Processor {
     }
 }
 
-use crate::utils::{seperate_channels, combine_channels};
+use crate::utils::{combine_channels, seperate_channels};
 
 /// extension of Processor to support multi-channel processing
 pub struct MultiChannelProcessor {
@@ -98,6 +111,10 @@ pub struct MultiChannelProcessor {
 }
 impl MultiChannelProcessor {
     pub fn process(&mut self) {
+        if self.plugins.is_empty() {
+            return;
+        }
+
         let data = seperate_channels(&self.data, self.channel_count as usize);
 
         let mut processed_data: Vec<Vec<f32>> = Vec::new();

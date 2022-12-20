@@ -10,6 +10,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use log::warn;
 use std::sync::mpsc;
+use std::sync::mpsc::TryRecvError;
 
 use super::super::Device;
 use super::super::Error;
@@ -19,23 +20,35 @@ pub struct InputController {
     receiver: mpsc::Receiver<Vec<f32>>,
 }
 impl InputController {
-    pub fn pull_data(&self) -> Vec<f32> {
+    pub fn try_pull_data(&self) -> Option<Vec<f32>> {
         let mut data = Vec::new();
         while let Ok(mut d) = self.receiver.try_recv() {
             data.append(&mut d);
         }
-        data
+
+        loop {
+            match self.receiver.try_recv() {
+                Ok(mut d) => data.append(&mut d),
+                Err(e) => match e {
+                    TryRecvError::Empty => break,
+                    // might be bad, because data gets lost, but this should not be reachable anyways
+                    TryRecvError::Disconnected => return None,
+                },
+            }
+        }
+
+        Some(data)
     }
 
-    pub fn pull_data_blocking(&self) -> Vec<f32> {
+    pub fn pull_data(&self) -> Option<Vec<f32>> {
         let mut data = Vec::new();
-        if let Ok(mut blocking_data) = self.receiver.recv() {
-            data.append(&mut blocking_data);
-        }
-        let mut non_blocking_data = self.pull_data();
+        let mut blocking_data = self.receiver.recv().ok()?;
+        data.append(&mut blocking_data);
+
+        let mut non_blocking_data = self.try_pull_data()?;
         data.append(&mut non_blocking_data);
 
-        data
+        Some(data)
     }
 }
 

@@ -1,9 +1,9 @@
 use macroquad::prelude::*;
 
-use audioviz::io::{Input, Device};
-use audioviz::utils::{seperate_channels, apodize};
+use audioviz::io::{Device, Input};
+use audioviz::utils::{apodize, seperate_channels};
 
-use audioviz::processor::{Processor, Plugin, Bandpass};
+use audioviz::processor::{Bandpass, Plugin, Processor};
 
 use std::io::Write;
 
@@ -31,22 +31,24 @@ async fn main() {
             buffer.append(&mut data[0]);
         }
 
-        let wanted_buf_size: u64 = BUFFER_LENGTH as u64; 
+        let wanted_buf_size: u64 = BUFFER_LENGTH as u64;
         let drain_amount: isize = buffer.len() as isize - wanted_buf_size as isize;
         if drain_amount < buffer.len() as isize && drain_amount > 0 {
             buffer.drain(0..drain_amount as usize);
         }
         let mut data = buffer.clone();
-        if !data.is_empty() {apodize(&mut data)}
+        if !data.is_empty() {
+            apodize(&mut data);
+        }
 
         // bandpass-filter
         if BANDPASS && !data.is_empty() {
             let mut processor = Processor {
                 data: data.to_vec(),
                 sampling_rate: sampling_rate as f32,
-                plugins: vec![
-                    Plugin::Bandpass(Bandpass::new(100.0, 200.0, 5000.0, 6000.0)),
-                ],
+                plugins: vec![Plugin::Bandpass(Bandpass::new(
+                    100.0, 200.0, 5000.0, 6000.0,
+                ))],
             };
             processor.process();
             data = processor.data;
@@ -58,27 +60,27 @@ async fn main() {
         let height = screen_height();
         let width = screen_width();
 
-        if !data.is_empty() {       
+        if !data.is_empty() {
             let mut data = data.iter().peekable();
             let mut x: f32 = 0.5;
             loop {
                 // determines positions of line
                 let y1: f32 = match data.next() {
                     Some(d) => *d,
-                    None => break
+                    None => break,
                 };
                 let y2: f32 = match data.peek() {
                     Some(d) => **d,
-                    None => break
+                    None => break,
                 };
                 let y1: f32 = height / 2.0 - (y1 * height) + 1.0;
                 let y2: f32 = height / 2.0 - (y2 * height) + 1.0;
-    
+
                 let x1: f32 = (x / buffer.len() as f32) * width;
-                let x2: f32 = ( (x + 1.0) / buffer.len() as f32 ) * width;
-    
+                let x2: f32 = ((x + 1.0) / buffer.len() as f32) * width;
+
                 draw_line(x1, y1, x2, y2, 1.0, WHITE);
-            
+
                 x += 1.0;
             }
         }
@@ -91,10 +93,10 @@ fn input(print: &str) -> String {
     std::io::stdout().flush().unwrap();
     let mut input = String::new();
 
-    std::io::stdin().read_line(&mut input)
+    std::io::stdin()
+        .read_line(&mut input)
         .ok()
         .expect("Couldn't read line");
-        
+
     input.trim().to_string()
 }
-

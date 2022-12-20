@@ -1,6 +1,7 @@
 use crate::fft;
-use crate::utils::{apodize, inverse_apodize};
 use core::f32::consts::PI;
+
+use crate::utils::{apodize, inverse_apodize};
 
 //
 // Rewritten from: "https://github.com/phip1611/lowpass-filter"
@@ -57,20 +58,15 @@ pub fn lowpass_filter(
     assert!(cutoff_end_freq >= cutoff_start_freq);
     assert!(cutoff_start_freq <= sampling_rate / 2.0 && cutoff_end_freq <= sampling_rate / 2.0);
 
-    // let data = apodize(data);
-    let mut data = data.to_vec();
-    for _ in 0..100 {
-        data.insert(0, 0.0);
-    }
-
+    let data = apodize(data);
     let len = data.len();
-    let spectrum_len = len / 2;
 
     let mut spectrum = fft::forward(&data);
+
     assert!(len == spectrum.len());
 
-    let start: usize = (spectrum_len as f32 * (cutoff_start_freq / sampling_rate * 2.0)) as usize;
-    let end: usize = (spectrum_len as f32 * (cutoff_end_freq / sampling_rate * 2.0)) as usize;
+    let start: usize = (len as f32 * (cutoff_start_freq / sampling_rate * 2.0)) as usize;
+    let end: usize = (len as f32 * (cutoff_end_freq / sampling_rate * 2.0)) as usize;
     let diff = end - start;
 
     // what to add to position in each iteration
@@ -81,23 +77,18 @@ pub fn lowpass_filter(
         for i in start..=end {
             let mul = (position.cos() + 1.0) / 2.0;
             spectrum[i] *= mul;
-            spectrum[len - i - 1] *= mul;
 
             position += step;
         }
-        for i in end..spectrum_len {
+        for i in end..len {
             spectrum[i] *= 0.0;
-            spectrum[len - i - 1] *= 0.0;
         }
     }
 
     // inverting
     let data = fft::inverse(&spectrum);
-    let mut data = fft::get_real(&data);
-    for _ in 0..100 {
-        data.remove(0);
-    }
-    // let data = inverse_apodize(&data);
+    let data = fft::get_real(&data);
+    let data = inverse_apodize(&data);
 
     data
 }
@@ -112,13 +103,12 @@ pub fn highpass_filter(
     assert!(cutoff_start_freq <= sampling_rate / 2.0 && cutoff_end_freq <= sampling_rate / 2.0);
 
     let len = data.len();
-    let spectrum_len = len / 2;
 
     let mut spectrum = fft::forward(&data);
     assert!(len == spectrum.len());
 
-    let start: usize = (spectrum_len as f32 * (cutoff_end_freq / sampling_rate * 2.0)) as usize;
-    let end: usize = (spectrum_len as f32 * (cutoff_start_freq / sampling_rate * 2.0)) as usize;
+    let start: usize = (len as f32 * (cutoff_end_freq / sampling_rate * 2.0)) as usize;
+    let end: usize = (len as f32 * (cutoff_start_freq / sampling_rate * 2.0)) as usize;
     let diff = end - start;
 
     // what to subract from position in each iteration
@@ -165,21 +155,16 @@ pub fn bandpass_filter(
     );
 
     let len = data.len();
-    let spectrum_len = len / 2;
 
     let mut spectrum = fft::forward(&data);
     assert!(len == spectrum.len());
 
-    let low_start: usize =
-        (spectrum_len as f32 * (low_cutoff_start_freq / sampling_rate * 2.0)) as usize;
-    let low_end: usize =
-        (spectrum_len as f32 * (low_cutoff_end_freq / sampling_rate * 2.0)) as usize;
+    let low_start: usize = (len as f32 * (low_cutoff_start_freq / sampling_rate * 2.0)) as usize;
+    let low_end: usize = (len as f32 * (low_cutoff_end_freq / sampling_rate * 2.0)) as usize;
     let low_diff = low_end - low_start;
 
-    let high_start: usize =
-        (spectrum_len as f32 * (high_cutoff_start_freq / sampling_rate * 2.0)) as usize;
-    let high_end: usize =
-        (spectrum_len as f32 * (high_cutoff_end_freq / sampling_rate * 2.0)) as usize;
+    let high_start: usize = (len as f32 * (high_cutoff_start_freq / sampling_rate * 2.0)) as usize;
+    let high_end: usize = (len as f32 * (high_cutoff_end_freq / sampling_rate * 2.0)) as usize;
     let high_diff = high_end - high_start;
 
     // what to subtract from low_position in each iteration
@@ -195,7 +180,6 @@ pub fn bandpass_filter(
         for i in low_start..=low_end {
             let mul = (low_position.cos() + 1.0) / 2.0;
             spectrum[i] *= mul;
-            spectrum[len - i - 1] *= mul;
 
             low_position -= low_step;
         }
@@ -204,7 +188,6 @@ pub fn bandpass_filter(
         for i in high_start..=high_end {
             let mul = (high_position.cos() + 1.0) / 2.0;
             spectrum[i] *= mul;
-            spectrum[len - i - 1] *= mul;
 
             high_position += high_step;
         }
@@ -213,12 +196,10 @@ pub fn bandpass_filter(
         // left from lowcut
         for i in 0..=low_start {
             spectrum[i] *= 0.0;
-            spectrum[len - i - 1] *= 0.0;
         }
         // right from highcut
-        for i in high_end..=spectrum_len {
+        for i in high_end..=len {
             spectrum[i] *= 0.0;
-            spectrum[len - i - 1] *= 0.0;
         }
     }
 
