@@ -64,7 +64,7 @@ pub enum Interpolation {
     /// | | | | | | | | | |
     /// +++++++++++++++++++
     /// ```
-    Linear,
+    Linear { dampen: bool },
 
     /// ```text
     ///           |  
@@ -88,9 +88,9 @@ pub struct ProcessorConfig {
     pub frequency_bounds: [usize; 2],
 
     /// number of total frequencies in processed data, None to disable up or downscaling
-    /// 
+    ///
     /// when `position_normalisation` and `resolution` is `None` no frequency information is lost
-    /// 
+    ///
     /// but when `position_normalisation` is set to anything else,
     /// information will be lost on high frequencies if no upscaling is done.
     pub resolution: Option<usize>,
@@ -101,7 +101,7 @@ pub struct ProcessorConfig {
     pub volume_normalisation: VolumeNormalisation,
 
     /// to mimic human hearing
-    /// 
+    ///
     /// might result in information loss on higher frequencies
     pub position_normalisation: PositionNormalisation,
 

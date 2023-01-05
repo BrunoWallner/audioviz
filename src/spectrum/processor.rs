@@ -249,7 +249,11 @@ impl Processor {
 
                 o_buf
             }
-            ConfigInterpolation::Linear => {
+            ConfigInterpolation::Linear { dampen } => {
+                fn dampen_fn(x: f32) -> f32 {
+                    6.0 * x.powi(5) - 15.0 * x.powi(4) + 10.0 * x.powi(3)
+                }
+
                 let mut o_buf: Vec<Frequency> = vec![Frequency::empty(); resolution];
                 let mut freqs = self.freq_buffer.iter().peekable();
                 'linear: loop {
@@ -272,6 +276,9 @@ impl Processor {
                             let mut percentage: f32 = pos as f32 / gap_size as f32;
                             if percentage.is_nan() {
                                 percentage = 0.5
+                            }
+                            if dampen {
+                                percentage = dampen_fn(percentage);
                             }
 
                             // interpolation
