@@ -33,8 +33,12 @@ pub fn combine_channels(mut data: Vec<Vec<f32>>) -> Vec<f32> {
 
 #[cfg(feature = "apodize")]
 pub fn apodize(data: &[f32]) -> Vec<f32> {
-    let window = apodize::hamming_iter(data.len()).collect::<Vec<f64>>();
     let mut buffer = Vec::with_capacity(data.len());
+    if data.len() == 0 {
+        return buffer;
+    }
+
+    let window = apodize::hamming_iter(data.len()).collect::<Vec<f64>>();
     for (i, value) in data.iter().enumerate() {
         let multiplier = window[i] as f32;
         let value = value * multiplier;
@@ -45,8 +49,12 @@ pub fn apodize(data: &[f32]) -> Vec<f32> {
 
 #[cfg(feature = "apodize")]
 pub fn inverse_apodize(data: &[f32]) -> Vec<f32> {
-    let window = apodize::hamming_iter(data.len()).collect::<Vec<f64>>();
     let mut buffer = Vec::with_capacity(data.len());
+    if data.len() == 0 {
+        return buffer;
+    }
+
+    let window = apodize::hamming_iter(data.len()).collect::<Vec<f64>>();
     for (i, value) in data.iter().enumerate() {
         let divisor = window[i] as f32;
         let value = value / divisor;
