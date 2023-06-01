@@ -34,7 +34,7 @@ pub fn combine_channels(mut data: Vec<Vec<f32>>) -> Vec<f32> {
 #[cfg(feature = "apodize")]
 pub fn apodize(data: &[f32]) -> Vec<f32> {
     let mut buffer = Vec::with_capacity(data.len());
-    if data.len() == 0 {
+    if data.len() < 2 {
         return buffer;
     }
 
@@ -50,7 +50,7 @@ pub fn apodize(data: &[f32]) -> Vec<f32> {
 #[cfg(feature = "apodize")]
 pub fn inverse_apodize(data: &[f32]) -> Vec<f32> {
     let mut buffer = Vec::with_capacity(data.len());
-    if data.len() == 0 {
+    if data.len() < 2 {
         return buffer;
     }
 

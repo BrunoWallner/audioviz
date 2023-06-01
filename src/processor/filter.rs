@@ -194,11 +194,11 @@ pub fn bandpass_filter(
 
         // mutes freqs that are beyond threshold
         // left from lowcut
-        for i in 0..=low_start {
+        for i in 0..low_start {
             spectrum[i] *= 0.0;
         }
         // right from highcut
-        for i in high_end..=len {
+        for i in high_end..len {
             spectrum[i] *= 0.0;
         }
     }
