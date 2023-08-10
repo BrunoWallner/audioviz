@@ -30,8 +30,8 @@ async fn main() {
         processor: ProcessorConfig {
             frequency_bounds: [35, 20_000],
             interpolation: Interpolation::Cubic,
-            volume: 0.2,
-            resolution: Some(128),
+            volume: 0.4,
+            resolution: None,
             ..ProcessorConfig::default()
         },
         ..StreamConfig::default()

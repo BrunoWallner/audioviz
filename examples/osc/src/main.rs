@@ -86,7 +86,7 @@ async fn main() {
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
     let (channel_count, sampling_rate, input_controller) =
-        audio_input.init(&Device::Id(id), None).unwrap();
+        audio_input.init(&Device::Id(id), Some(1024)).unwrap();
 
     let mut data = Data::new(input_controller, channel_count as usize);
     loop {
