@@ -21,16 +21,17 @@ async fn main() {
     let id: usize = input("id: ").parse().unwrap_or(0);
 
     let (channel_count, _sampling_rate, audio_receiver) =
-        audio_input.init(&Device::Id(id)).unwrap();
+        audio_input.init(&Device::Id(id), Some(1024)).unwrap();
 
     let stream_config: StreamConfig = StreamConfig {
         channel_count,
         gravity: Some(2.0),
-        fft_resolution: 1024 * 4,
+        fft_resolution: 1024 * 3,
         processor: ProcessorConfig {
-            frequency_bounds: [50, 20_000],
-            interpolation: Interpolation::Step,
-            volume: 0.1,
+            frequency_bounds: [35, 20_000],
+            interpolation: Interpolation::Cubic,
+            volume: 0.2,
+            resolution: Some(128),
             ..ProcessorConfig::default()
         },
         ..StreamConfig::default()

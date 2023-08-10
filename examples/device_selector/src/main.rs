@@ -1,4 +1,4 @@
-use audioviz::io::{Input, Device};
+use audioviz::io::{Device, Input};
 
 fn main() {
     let mut audio_input = Input::new();
@@ -18,9 +18,9 @@ fn main() {
     };
     let device = devices[id].clone();
     println!("capturing audio from: {}", device);
-    
+
     // must be in scope, otherwise capture will stop
-    let _ = audio_input.init(&Device::Id(id)).unwrap();
+    let _ = audio_input.init(&Device::Id(id), None).unwrap();
     loop {}
 }
 
@@ -31,9 +31,10 @@ fn input(print: &str) -> String {
     std::io::stdout().flush().unwrap();
     let mut input = String::new();
 
-    std::io::stdin().read_line(&mut input)
+    std::io::stdin()
+        .read_line(&mut input)
         .ok()
         .expect("Couldn't read line");
-        
+
     input.trim().to_string()
 }

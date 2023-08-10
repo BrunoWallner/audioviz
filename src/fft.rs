@@ -3,6 +3,8 @@
 //!
 //! dependency of `spectrum`
 //!
+// use std::f32::consts::PI;
+
 pub use rustfft::num_complex::Complex;
 use rustfft::FftPlanner;
 
@@ -43,6 +45,22 @@ pub fn inverse(data: &[Complex<f32>]) -> Vec<Complex<f32>> {
 
     data.to_vec()
 }
+
+/* holy fucking shit O(n¹) */
+// pub fn inverse(data: &[Complex<f32>]) -> Vec<Complex<f32>> {
+//     let length = data.len();
+//     let mut output: Vec<Complex<f32>> = vec![Complex { re: 0.0, im: 0.0 }; length];
+
+//     for (wave_length, amplitude) in data.iter().enumerate() {
+//         let wave_length: f32 = (length * wave_length) as f32;
+//         let multiplier: f32 = PI / wave_length;
+//         for i in 0..length {
+//             output[i].re += (i as f32 * multiplier).sin() * amplitude.re;
+//         }
+//     }
+
+//     output
+// }
 
 pub fn remove_mirroring(data: &[f32]) -> Vec<f32> {
     let len = data.len() / 2 + 1;

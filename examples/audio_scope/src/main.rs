@@ -21,7 +21,8 @@ async fn main() {
     }
     let id: usize = input("id: ").parse().unwrap_or(0);
 
-    let (channel_count, sampling_rate, audio_receiver) = audio_input.init(&Device::Id(id)).unwrap();
+    let (channel_count, sampling_rate, audio_receiver) =
+        audio_input.init(&Device::Id(id), None).unwrap();
 
     let mut buffer: Vec<f32> = Vec::new();
 

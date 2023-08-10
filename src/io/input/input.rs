@@ -8,6 +8,7 @@
 //! for this I recommend to use `https://github.com/Stebalien/gag-rs`
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::StreamConfig;
 use log::warn;
 use std::sync::mpsc;
 use std::sync::mpsc::TryRecvError;
@@ -64,12 +65,16 @@ impl Input {
         return Self { host, stream: None };
     }
     /// returns: `channel_count`, `sampling_rate` and `CaptureReceiver`
-    pub fn init(&mut self, device: &Device) -> Result<(u16, u32, InputController), Error> {
+    pub fn init(
+        &mut self,
+        device: &Device,
+        buffer_size: Option<u32>,
+    ) -> Result<(u16, u32, InputController), Error> {
         let (sender, receiver) = mpsc::channel();
         let input_controller = InputController { receiver };
 
         let (channel_count, stream, sampling_rate) =
-            match stream_audio_to_distributor(&self.host, sender, device) {
+            match stream_audio_to_distributor(&self.host, sender, device, buffer_size) {
                 Ok(s) => s,
                 Err(e) => return Err(e),
             };
@@ -102,6 +107,7 @@ fn stream_audio_to_distributor(
     host: &cpal::platform::Host,
     sender: mpsc::Sender<Vec<f32>>,
     device: &Device,
+    buffer_size: Option<u32>,
     // returns channel-count, stream and sampling-rate
 ) -> Result<(u16, cpal::Stream, u32), Error> {
     let device = match device {
@@ -122,16 +128,42 @@ fn stream_audio_to_distributor(
         },
     };
 
-    let config: cpal::SupportedStreamConfig = match device.default_input_config() {
+    let supported_config: cpal::SupportedStreamConfig = match device.default_input_config() {
         Ok(c) => c,
         Err(_) => return Err(Error::DeviceNotAvailable),
     };
 
-    let channel_count = config.channels();
-    let sampling_rate = config.sample_rate();
+    let config: StreamConfig = if let Some(buffer_size) = buffer_size {
+        StreamConfig {
+            channels: supported_config.channels(),
+            sample_rate: supported_config.sample_rate(),
+            buffer_size: cpal::BufferSize::Fixed(buffer_size),
+        }
+    } else {
+        supported_config.into()
+    };
+
+    let channel_count = config.channels;
+    let sampling_rate = config.sample_rate;
+
+    // let config: cpal::SupportedStreamConfig = match device.default_input_config() {
+    //     Ok(c) => c,
+    //     Err(_) => return Err(Error::DeviceNotAvailable),
+    // };
+
+    // let config = StreamConfig {
+    //     channels: 2,
+    //     sample_rate: SampleRate(48_000),
+    //     buffer_size: cpal::BufferSize::Fixed(256),
+    // };
+    // println!("buffer size: {:?}", config.buffer_size());
+
+    // let channel_count = config.channels();
+    // let sampling_rate = config.sample_rate();
 
     #[allow(unused_must_use)]
-    let stream = match config.sample_format() {
+    // let stream = match config.sample_format() {
+    let stream = match cpal::SampleFormat::F32 {
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             move |data: &[f32], _: &_| {
@@ -174,4 +206,5 @@ fn stream_audio_to_distributor(
     stream.play().unwrap();
 
     Ok((channel_count, stream, sampling_rate.0))
+    // Ok((2, stream, 48_000))
 }
