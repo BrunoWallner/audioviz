@@ -14,7 +14,7 @@
 //!
 //! // captures audio from system using cpal
 //! let mut audio_input = Input::new();
-//! let (channel_count, sampling_rate, input_controller) = audio_input.init(&Device::DefaultInput).unwrap();
+//! let (channel_count, sampling_rate, input_controller) = audio_input.init(&Device::DefaultInput, None).unwrap();
 //!
 //! // spectrum visualizer stream
 //! let mut stream: Stream = Stream::new(StreamConfig::default());
